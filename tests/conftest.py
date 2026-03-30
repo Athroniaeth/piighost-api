@@ -1,5 +1,6 @@
 """Shared fixtures for piighost-api tests."""
 
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,9 +11,15 @@ from piighost.models import Detection, Entity, Span
 from piighost.placeholder import CounterPlaceholderFactory
 
 
-def _make_entity(text: str, label: str, start: int, end: int, confidence: float = 0.95) -> Entity:
+def _make_entity(
+    text: str, label: str, start: int, end: int, confidence: float = 0.95
+) -> Entity:
     return Entity(
-        detections=(Detection(text=text, label=label, position=Span(start, end), confidence=confidence),)
+        detections=(
+            Detection(
+                text=text, label=label, position=Span(start, end), confidence=confidence
+            ),
+        )
     )
 
 
@@ -26,14 +33,19 @@ def mock_pipeline() -> MagicMock:
     pipeline = MagicMock()
 
     pipeline.anonymize = AsyncMock(
-        return_value=("<<PERSON_1>> habite à <<LOCATION_1>>", [ENTITY_PERSON, ENTITY_LOCATION])
+        return_value=(
+            "<<PERSON_1>> habite à <<LOCATION_1>>",
+            [ENTITY_PERSON, ENTITY_LOCATION],
+        )
     )
     pipeline.deanonymize = AsyncMock(
         return_value=("Patrick habite à Paris", [ENTITY_PERSON, ENTITY_LOCATION])
     )
     pipeline.deanonymize_with_ent = AsyncMock(return_value="Patrick aime Paris")
 
-    pipeline.get_resolved_entities = MagicMock(return_value=[ENTITY_PERSON, ENTITY_LOCATION])
+    pipeline.get_resolved_entities = MagicMock(
+        return_value=[ENTITY_PERSON, ENTITY_LOCATION]
+    )
 
     ph_factory = CounterPlaceholderFactory()
     pipeline.ph_factory = ph_factory
@@ -54,7 +66,7 @@ def app(mock_pipeline: MagicMock) -> Litestar:
 
 
 @pytest.fixture
-def client(app: Litestar) -> TestClient:
+def client(app: Litestar) -> Generator[TestClient, None, None]:
     """Litestar sync test client."""
     with TestClient(app=app) as tc:
         yield tc

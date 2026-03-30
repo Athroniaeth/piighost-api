@@ -23,7 +23,9 @@ def create_auth_guard(svc: ApiKeyService):
         An async guard callable for Litestar's ``guards`` parameter.
     """
 
-    async def auth_guard(connection: ASGIConnection[Any, Any, Any, Any], _: BaseRouteHandler) -> None:
+    async def auth_guard(
+        connection: ASGIConnection[Any, Any, Any, Any], _: BaseRouteHandler
+    ) -> None:
         auth = connection.headers.get("authorization", "")
 
         if not auth.startswith("Bearer "):

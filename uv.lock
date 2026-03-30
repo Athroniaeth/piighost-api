@@ -1193,15 +1193,15 @@ wheels = [
 
 [[package]]
 name = "piighost"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2e/3b/88a314b122caf9c3816436dec976aa50ca5be4edcabf718810ed1ae44fc9/piighost-0.3.0.tar.gz", hash = "sha256:57f4e9f63376e0320c00f1e18ec06d0d4219ecf6171cf74721a93d606a6761a9", size = 499716, upload-time = "2026-03-29T18:57:48.763Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/28/64/3e8da7e13ec95f4ab7be56c0809585792b18ccfc7cd83ac15659b5478c3c/piighost-0.4.0.tar.gz", hash = "sha256:7a215824ff2bb4b10ac018222dd7dc269d59c333748b0973b4b2b6ed55c72e56", size = 500903, upload-time = "2026-03-30T10:45:39.556Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/be/0f7c3a105a5281fa0699b920cafc7f00494fe10a9565e08899f8f8a79e0d/piighost-0.3.0-py3-none-any.whl", hash = "sha256:efd43d9f4f5ebfee965afcf2631aa59147d05e634cfc29dc4f687ae91fefdd6d", size = 33983, upload-time = "2026-03-29T18:57:47.351Z" },
+    { url = "https://files.pythonhosted.org/packages/80/65/8c5a5f1634f672e965fd33cb0ab0583c659bd5ff1b22c3d89226e0d39680/piighost-0.4.0-py3-none-any.whl", hash = "sha256:1da1b49bbe3a20394bb11d6fe9f6f321c439bb02d027b312b3842c43566f3f6d", size = 35794, upload-time = "2026-03-30T10:45:38.335Z" },
 ]
 
 [package.optional-dependencies]
-gliner = [
+gliner2 = [
     { name = "gliner2" },
 ]
 
@@ -1211,11 +1211,10 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiocache" },
-    { name = "gliner2" },
     { name = "keyshield", extra = ["argon2"] },
     { name = "litestar" },
     { name = "msgspec" },
-    { name = "piighost" },
+    { name = "piighost", extra = ["gliner2"] },
     { name = "requests" },
     { name = "uvicorn" },
 ]
@@ -1229,19 +1228,14 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
-gliner = [
-    { name = "gliner2" },
-    { name = "piighost", extra = ["gliner"] },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "aiocache", specifier = ">=0.12" },
-    { name = "gliner2", specifier = ">=1.2.5" },
     { name = "keyshield", extras = ["argon2"], specifier = ">=2.0" },
     { name = "litestar", specifier = ">=2.16" },
     { name = "msgspec", specifier = ">=0.19" },
-    { name = "piighost", specifier = ">=0.3" },
+    { name = "piighost", extras = ["gliner2"], specifier = ">=0.4" },
     { name = "requests", specifier = ">=2.32" },
     { name = "uvicorn", specifier = ">=0.34" },
 ]
@@ -1254,10 +1248,6 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.25" },
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.15" },
-]
-gliner = [
-    { name = "gliner2", specifier = ">=1.2" },
-    { name = "piighost", extras = ["gliner"] },
 ]
 
 [[package]]

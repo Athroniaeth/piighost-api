@@ -34,7 +34,7 @@ def test_wrong_type() -> None:
 def test_load_valid_pipeline() -> None:
     mock_pipeline = MagicMock(spec=ThreadAnonymizationPipeline)
     fake_module = types.ModuleType("fake_pipeline_mod")
-    fake_module.pipeline = mock_pipeline
+    setattr(fake_module, "pipeline", mock_pipeline)
 
     with patch.dict(sys.modules, {"fake_pipeline_mod": fake_module}):
         result = load_pipeline("fake_pipeline_mod:pipeline")
@@ -50,7 +50,7 @@ def test_adds_cwd_to_syspath(tmp_path, monkeypatch) -> None:
 
     mock_pipeline = MagicMock(spec=ThreadAnonymizationPipeline)
     fake_module = types.ModuleType("test_mod")
-    fake_module.pipe = mock_pipeline
+    setattr(fake_module, "pipe", mock_pipeline)
 
     with patch.dict(sys.modules, {"test_mod": fake_module}):
         load_pipeline("test_mod:pipe")

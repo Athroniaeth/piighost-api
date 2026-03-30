@@ -29,13 +29,12 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "piighost>=0.3",
+    "piighost[gliner2]>=0.4",
+    "keyshield[argon2]>=2.0",
     "litestar>=2.16",
     "uvicorn>=0.34",
-    "keyshield[argon2]>=2.0",
     "aiocache>=0.12",
     "msgspec>=0.19",
-    "gliner2>=1.2.5",
     "requests>=2.32",
 ]
 
@@ -69,8 +68,4 @@ dev = [
     "pytest-asyncio>=0.25",
     "pyrefly>=0.55",
     "commitizen>=4.13",
-]
-gliner = [
-    "piighost[gliner]",
-    "gliner2>=1.2",
 ]

@@ -16,7 +16,20 @@ def test_no_command_exits() -> None:
 
 
 def test_serve_sets_env_and_runs_uvicorn() -> None:
-    with patch("sys.argv", ["piighost-api", "serve", "mymod:pipe", "--host", "0.0.0.0", "--port", "9000", "--log-level", "debug"]):
+    with patch(
+        "sys.argv",
+        [
+            "piighost-api",
+            "serve",
+            "mymod:pipe",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9000",
+            "--log-level",
+            "debug",
+        ],
+    ):
         with patch("piighost_api.cli.uvicorn") as mock_uvicorn:
             main()
 

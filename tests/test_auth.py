@@ -1,8 +1,7 @@
 """Tests for auth.py — keyshield guard."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from litestar import Litestar, get
 from litestar.testing import TestClient
 
@@ -25,7 +24,9 @@ def _make_app_with_auth(verify_side_effect=None) -> Litestar:
 def test_valid_bearer_token() -> None:
     app = _make_app_with_auth(verify_side_effect=None)
     with TestClient(app=app) as client:
-        response = client.get("/protected", headers={"Authorization": "Bearer valid-key"})
+        response = client.get(
+            "/protected", headers={"Authorization": "Bearer valid-key"}
+        )
         assert response.status_code == 200
         assert response.json()["ok"] is True
 

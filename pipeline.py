@@ -11,7 +11,10 @@ from piighost.detector.gliner2 import Gliner2Detector
 from piighost.linker.entity import ExactEntityLinker
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
 from piighost.placeholder import CounterPlaceholderFactory
-from piighost.resolver import MergeEntityConflictResolver, ConfidenceSpanConflictResolver
+from piighost.resolver import (
+    MergeEntityConflictResolver,
+    ConfidenceSpanConflictResolver,
+)
 
 entity_linker = ExactEntityLinker()
 entity_resolver = MergeEntityConflictResolver()

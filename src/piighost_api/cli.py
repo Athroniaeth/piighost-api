@@ -56,6 +56,7 @@ def main() -> None:
     # Litestar's app factory pattern: we pass a callable string to uvicorn,
     # but since we need the pipeline arg, we use an env var.
     import os
+
     os.environ["PIIGHOST_PIPELINE"] = args.pipeline
 
     uvicorn.run(

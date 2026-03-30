@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from litestar.testing import TestClient
 
 from piighost.exceptions import CacheMissError
@@ -53,12 +52,16 @@ def test_anonymize(client: TestClient) -> None:
     assert data["entities"][0]["detections"][0]["text"] == "Patrick"
 
 
-def test_anonymize_custom_thread_id(mock_pipeline: MagicMock, client: TestClient) -> None:
+def test_anonymize_custom_thread_id(
+    mock_pipeline: MagicMock, client: TestClient
+) -> None:
     client.post(
         "/v1/anonymize",
         json={"text": "Patrick habite à Paris", "thread_id": "custom-123"},
     )
-    mock_pipeline.anonymize.assert_called_once_with("Patrick habite à Paris", thread_id="custom-123")
+    mock_pipeline.anonymize.assert_called_once_with(
+        "Patrick habite à Paris", thread_id="custom-123"
+    )
 
 
 # ------------------------------------------------------------------
@@ -115,9 +118,7 @@ def test_serialize_entities(mock_pipeline: MagicMock) -> None:
 
 
 def test_serialize_entities_no_match(mock_pipeline: MagicMock) -> None:
-    unknown = Entity(
-        detections=(Detection("Unknown", "OTHER", Span(0, 7), 0.5),)
-    )
+    unknown = Entity(detections=(Detection("Unknown", "OTHER", Span(0, 7), 0.5),))
     result = _serialize_entities([unknown], mock_pipeline, "default")
     assert result[0].placeholder == ""
 
@@ -169,7 +170,9 @@ def test_lifespan_auth_failure() -> None:
     mock_pipeline.get_resolved_entities = MagicMock(return_value=[])
 
     with patch("piighost_api.app.load_pipeline", return_value=mock_pipeline):
-        with patch.dict("os.environ", {"API_KEY_bad": "invalid-key-format"}, clear=False):
+        with patch.dict(
+            "os.environ", {"API_KEY_bad": "invalid-key-format"}, clear=False
+        ):
             from piighost_api.app import create_app
 
             app = create_app("fake:pipeline")
