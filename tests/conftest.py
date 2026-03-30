@@ -17,14 +17,14 @@ def _make_entity(
     return Entity(
         detections=(
             Detection(
-                text=text, label=label, position=Span(start, end), confidence=confidence
+                text=text, label=label, position=Span(start, end), confidence=confidence,
             ),
         )
     )
 
 
-ENTITY_PERSON = _make_entity("Patrick", "PERSON", 0, 7)
-ENTITY_LOCATION = _make_entity("Paris", "LOCATION", 17, 22, confidence=0.92)
+ENTITY_PERSON = _make_entity("Patrick", "PERSON", 0, 7,)
+ENTITY_LOCATION = _make_entity("Paris", "LOCATION", 17, 22, confidence=0.92,)
 
 
 @pytest.fixture

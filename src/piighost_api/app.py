@@ -11,6 +11,7 @@ from keyshield.hasher.argon2 import Argon2ApiKeyHasher
 from keyshield.repositories.in_memory import InMemoryApiKeyRepository
 from litestar import Litestar, get, post
 from litestar.exceptions import NotFoundException
+from litestar.openapi import OpenAPIConfig
 
 from piighost.exceptions import CacheMissError
 from piighost.models import Entity
@@ -68,6 +69,17 @@ class DeanonymizeEntResponse(msgspec.Struct):
 class ConfigResponse(msgspec.Struct):
     labels: list[str] | None
     placeholder_factory: str
+
+
+class IndexResponse(msgspec.Struct):
+    name: str
+    version: str
+    docs: str
+
+
+class HealthResponse(msgspec.Struct):
+    status: str
+    detector: str
 
 
 # ------------------------------------------------------------------
@@ -157,6 +169,21 @@ def create_app(pipeline_path: str) -> Litestar:
     # Route handlers (closures over pipeline)
     # ------------------------------------------------------------------
 
+    @get("/", exclude_from_auth=True)
+    async def index() -> IndexResponse:
+        return IndexResponse(
+            name="piighost-api",
+            version="0.1.0",
+            docs="/schema/swagger",
+        )
+
+    @get("/health", exclude_from_auth=True)
+    async def health() -> HealthResponse:
+        return HealthResponse(
+            status="ok",
+            detector=type(pipeline._detector).__name__,
+        )
+
     @get("/v1/config")
     async def get_config() -> ConfigResponse:
         labels = _get_detector_labels(pipeline)
@@ -210,6 +237,8 @@ def create_app(pipeline_path: str) -> Litestar:
 
     return Litestar(
         route_handlers=[
+            index,
+            health,
             get_config,
             anonymize,
             deanonymize,
@@ -217,4 +246,9 @@ def create_app(pipeline_path: str) -> Litestar:
         ],
         guards=guards,
         lifespan=[lifespan],
+        openapi_config=OpenAPIConfig(
+            title="piighost-api",
+            version="0.1.0",
+            description="REST API for piighost PII anonymization inference.",
+        ),
     )

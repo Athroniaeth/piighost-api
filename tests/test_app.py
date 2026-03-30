@@ -18,6 +18,38 @@ from conftest import ENTITY_LOCATION, ENTITY_PERSON
 # ------------------------------------------------------------------
 
 
+# ------------------------------------------------------------------
+# GET /
+# ------------------------------------------------------------------
+
+
+def test_index(client: TestClient) -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "piighost-api"
+    assert data["version"] == "0.1.0"
+    assert data["docs"] == "/schema/swagger"
+
+
+# ------------------------------------------------------------------
+# GET /health
+# ------------------------------------------------------------------
+
+
+def test_health(client: TestClient) -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "detector" in data
+
+
+# ------------------------------------------------------------------
+# GET /v1/config
+# ------------------------------------------------------------------
+
+
 def test_get_config(client: TestClient) -> None:
     response = client.get("/v1/config")
     assert response.status_code == 200

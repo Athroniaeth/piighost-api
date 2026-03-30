@@ -9,6 +9,7 @@ services:
       - API_KEY_default=${API_KEY}
     volumes:
       - ./pipeline.py:/app/pipeline.py
+      - huggingface-cache:/root/.cache/huggingface
     depends_on:
       - redis
 
@@ -21,3 +22,4 @@ services:
 
 volumes:
   redis-data:
+  huggingface-cache:
