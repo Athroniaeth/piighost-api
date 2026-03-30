@@ -1,3 +1,9 @@
+## 0.3.1 (2026-03-30)
+
+### Fix
+
+- guard optional dependency imports (aiocache, faker, langgraph)
+
 ## 0.3.0 (2026-03-30)
 
 ### Fix
