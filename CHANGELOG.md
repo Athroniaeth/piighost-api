@@ -1,3 +1,15 @@
+## 0.3.0 (2026-03-30)
+
+### Fix
+
+- guard optional dependency imports (aiocache, faker, langgraph)
+
+## 0.3.0 (2026-03-30)
+
+### Feat
+
+- configurable Docker setup via .env with documented keyshield auth
+
 ## 0.2.0 (2026-03-30)
 
 ### Feat
