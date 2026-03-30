@@ -1,0 +1,74 @@
+[project]
+name = "piighost-api"
+version = "0.1.0"
+description = "REST API server for piighost PII anonymization inference."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Athroniaeth" },
+]
+keywords = [
+    "pii",
+    "anonymization",
+    "api",
+    "inference",
+    "ner",
+    "gliner",
+    "privacy",
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "piighost>=0.3",
+    "litestar>=2.16",
+    "uvicorn>=0.34",
+    "keyshield[argon2]>=2.0",
+    "aiocache>=0.12",
+    "msgspec>=0.19",
+    "gliner2>=1.2.5",
+    "requests>=2.32",
+]
+
+[project.urls]
+Homepage = "https://github.com/Athroniaeth/piighost-api"
+Issues = "https://github.com/Athroniaeth/piighost-api/issues"
+
+[project.scripts]
+piighost-api = "piighost_api.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/piighost_api"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=src/piighost_api"
+asyncio_mode = "auto"
+
+[tool.coverage.report]
+show_missing = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15",
+    "pytest>=9.0",
+    "pytest-cov>=6.0",
+    "pytest-asyncio>=0.25",
+    "pyrefly>=0.55",
+]
+gliner = [
+    "piighost[gliner]",
+    "gliner2>=1.2",
+]
