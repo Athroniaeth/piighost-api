@@ -42,6 +42,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/Athroniaeth/piighost-api"
 Issues = "https://github.com/Athroniaeth/piighost-api/issues"
+Changelog = "https://github.com/Athroniaeth/piighost-api/blob/master/CHANGELOG.md"
 
 [project.scripts]
 piighost-api = "piighost_api.cli:main"
@@ -67,6 +68,7 @@ dev = [
     "pytest-cov>=6.0",
     "pytest-asyncio>=0.25",
     "pyrefly>=0.55",
+    "commitizen>=4.13",
 ]
 gliner = [
     "piighost[gliner]",
