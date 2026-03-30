@@ -238,6 +238,11 @@ sequenceDiagram
     A->>F: deanonymized text
 ```
 
+## Ecosystem
+
+- **[piighost](https://github.com/Athroniaeth/piighost)** — Core PII anonymization library with GLiNER2 NER, regex detectors, entity linking, and LangChain middleware.
+- **[piighost-chat](https://github.com/Athroniaeth/piighost-chat)** — Demo chat app using this API for real-time PII detection and a LangChain agent with `PIIAnonymizationMiddleware` for privacy-preserving AI conversations.
+
 ## Development
 
 ```bash
