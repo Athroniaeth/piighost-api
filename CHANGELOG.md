@@ -1,3 +1,15 @@
+## 0.2.0 (2026-03-30)
+
+### Feat
+
+- configurable Docker setup via .env with documented keyshield auth
+- add CompositeDetector with GLiNER2 semantic labels and regex patterns (EU+US)
+- add index, health, OpenAPI docs routes and HuggingFace cache volume
+
+### Fix
+
+- resolve pyrefly type-checking errors in tests
+
 ## 0.1.0 (2026-03-30)
 
 ### Feat
