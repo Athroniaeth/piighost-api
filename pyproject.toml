@@ -1,6 +1,6 @@
 [project]
 name = "piighost-api"
-version = "0.3.1"
+version = "0.3.2"
 description = "REST API server for piighost PII anonymization inference."
 readme = "README.md"
 license = { text = "MIT" }

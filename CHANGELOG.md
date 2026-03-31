@@ -1,3 +1,9 @@
+## 0.3.2 (2026-03-31)
+
+### Perf
+
+- use cpu-only torch to reduce docker image from ~5 GB to ~1.1 GB
+
 ## 0.3.1 (2026-03-30)
 
 ### Fix
