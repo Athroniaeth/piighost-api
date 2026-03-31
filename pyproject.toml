@@ -30,6 +30,7 @@ classifiers = [
 requires-python = ">=3.12"
 dependencies = [
     "piighost[gliner2]>=0.4",
+    "torch>=2.0",
     "keyshield[argon2]>=2.0",
     "litestar>=2.16",
     "uvicorn>=0.34",
@@ -62,6 +63,14 @@ asyncio_mode = "auto"
 
 [tool.coverage.report]
 show_missing = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [dependency-groups]
 dev = [

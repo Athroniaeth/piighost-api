@@ -7,6 +7,8 @@ RUN pip install --no-cache-dir uv
 
 # Copy project metadata and install dependencies
 COPY pyproject.toml uv.lock* README.md ./
+
+# Install dependencies (torch resolves to CPU-only via tool.uv.sources)
 RUN uv sync --frozen --no-dev --no-progress || uv sync --no-dev --no-progress
 
 # Copy source code
