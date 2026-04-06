@@ -1,3 +1,9 @@
+## 0.3.3 (2026-04-07)
+
+### Fix
+
+- run venv binary directly in CMD to avoid uv re-sync at startup
+
 ## 0.3.2 (2026-03-31)
 
 ### Perf
