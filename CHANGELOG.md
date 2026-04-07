@@ -1,3 +1,9 @@
+## 0.4.0 (2026-04-07)
+
+### Feat
+
+- remove gliner2/torch from base deps, add EXTRA_PACKAGES and PIIGHOST_EXTRAS support
+
 ## 0.3.3 (2026-04-07)
 
 ### Fix
