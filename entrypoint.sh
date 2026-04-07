@@ -5,7 +5,7 @@ set -e
 # Usage: EXTRA_PACKAGES="spacy faker" docker compose up
 if [ -n "$EXTRA_PACKAGES" ]; then
     echo "Installing extra packages: $EXTRA_PACKAGES"
-    /app/.venv/bin/pip install --no-cache-dir $EXTRA_PACKAGES
+    uv pip install --no-cache-dir --python /app/.venv/bin/python $EXTRA_PACKAGES
 fi
 
 exec "$@"
