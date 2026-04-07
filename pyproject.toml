@@ -29,8 +29,7 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "piighost[gliner2]>=0.4",
-    "torch>=2.0",
+    "piighost>=0.5",
     "keyshield[argon2]>=2.0",
     "litestar>=2.16",
     "uvicorn>=0.34",

@@ -4,14 +4,13 @@ This file is loaded by the server via the ``module:variable`` pattern::
 
     piighost-api serve pipeline:pipeline
 
-Combines GLiNER2 (semantic NER) with regex detectors (common, EU, US)
-for comprehensive PII coverage.
+Uses regex detectors (common, EU, US) for PII coverage out of the box.
+To add GLiNER2 semantic NER, install ``piighost[gliner2]`` and uncomment
+the GLiNER2 section below.
 """
 
-from gliner2 import GLiNER2
 from piighost.anonymizer import Anonymizer
 from piighost.detector import CompositeDetector, RegexDetector
-from piighost.detector.gliner2 import Gliner2Detector
 from piighost.linker.entity import ExactEntityLinker
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
 from piighost.placeholder import CounterPlaceholderFactory
@@ -21,53 +20,25 @@ from piighost.resolver import (
 )
 
 # ------------------------------------------------------------------
-# GLiNER2 detector : semantic NER labels
+# (Optional) GLiNER2 detector : semantic NER labels
+# Requires: piighost[gliner2]  (includes torch + gliner2)
 # ------------------------------------------------------------------
-PII_LABELS = [
-    # Identity
-    "person",
-    "first name",
-    "last name",
-    "date of birth",
-    "age",
-    "gender",
-    "nationality",
-    # Contact
-    "email address",
-    "phone number",
-    "physical address",
-    "zip code",
-    "city",
-    # Official IDs
-    "social security number",
-    "passport number",
-    "driver's license number",
-    "national id number",
-    "tax identification number",
-    # Financial
-    "credit card number",
-    "bank account number",
-    "IBAN",
-    # Technical
-    "IP address",
-    "license plate number",
-    "username",
-    "password",
-    # Professional
-    "organization",
-    "company",
-    "job title",
-    # Medical
-    "medical condition",
-    "medication",
-    "health insurance number",
-]
-model = GLiNER2.from_pretrained("fastino/gliner2-multi-v1")
-gliner2_detector = Gliner2Detector(
-    model=model,
-    threshold=0.5,
-    labels=PII_LABELS,
-)
+# from gliner2 import GLiNER2
+# from piighost.detector.gliner2 import Gliner2Detector
+#
+# PII_LABELS = [
+#     "person", "first name", "last name", "date of birth", "age",
+#     "gender", "nationality", "email address", "phone number",
+#     "physical address", "zip code", "city", "social security number",
+#     "passport number", "driver's license number", "national id number",
+#     "tax identification number", "credit card number",
+#     "bank account number", "IBAN", "IP address",
+#     "license plate number", "username", "password",
+#     "organization", "company", "job title",
+#     "medical condition", "medication", "health insurance number",
+# ]
+# model = GLiNER2.from_pretrained("fastino/gliner2-multi-v1")
+# gliner2_detector = Gliner2Detector(model=model, threshold=0.5, labels=PII_LABELS)
 
 # ------------------------------------------------------------------
 # Common regex detector : universal patterns
@@ -135,7 +106,7 @@ us_detector = RegexDetector(
 
 detector = CompositeDetector(
     detectors=[
-        gliner2_detector,
+        # gliner2_detector,  # uncomment if piighost[gliner2] is installed
         common_detector,
         eu_detector,
         us_detector,
