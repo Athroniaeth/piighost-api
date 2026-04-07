@@ -5,11 +5,11 @@
 [![Deps: uv](https://img.shields.io/badge/deps-managed%20with%20uv-3E4DD8.svg)](https://docs.astral.sh/uv/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-4B32C3.svg)](https://docs.astral.sh/ruff/)
 
-`piighost-api` is a REST API server for [piighost](https://github.com/Athroniaeth/piighost) PII anonymization inference. It runs a NER model (GLiNER2) once server-side and exposes anonymization/deanonymization via HTTP, so clients only need a lightweight HTTP client instead of embedding a ~500 MB model.
+`piighost-api` is a REST API server for [piighost](https://github.com/Athroniaeth/piighost) PII anonymization inference. It loads a configurable pipeline once server-side and exposes anonymization/deanonymization via HTTP, so clients only need a lightweight HTTP client.
 
 ## Features
 
-- **NER inference server** — GLiNER2 (or any piighost detector) loaded once, shared across requests
+- **PII inference server** — any piighost detector (regex, GLiNER2, spaCy, …) loaded once, shared across requests
 - **Anonymize / deanonymize endpoints** — full pipeline with entity detection, linking, and resolution
 - **Thread-scoped memory** — conversation entities tracked per `thread_id` for cross-message linking
 - **API key authentication** — [keyshield](https://github.com/Athroniaeth/keyshield) with Argon2 hashing, scopes, and expiration
@@ -21,13 +21,37 @@
 
 ### 1. Create your pipeline
 
-Create a `pipeline.py` that configures the anonymization pipeline:
+Create a `pipeline.py` that configures the anonymization pipeline. The base image ships with regex detectors only (218 MB). For NER-based detection, install extras via `EXTRA_PACKAGES` or `PIIGHOST_EXTRAS`.
+
+**Regex-only (no extra dependencies):**
+
+```python
+from piighost.anonymizer import Anonymizer
+from piighost.detector import RegexDetector
+from piighost.linker.entity import ExactEntityLinker
+from piighost.pipeline.thread import ThreadAnonymizationPipeline
+from piighost.placeholder import CounterPlaceholderFactory
+from piighost.resolver.entity import MergeEntityConflictResolver
+from piighost.resolver.span import ConfidenceSpanConflictResolver
+
+pipeline = ThreadAnonymizationPipeline(
+    detector=RegexDetector(patterns={
+        "EMAIL": r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
+        "PHONE": r"\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?(?:[\s.\-]?\d{1,4}){1,4}",
+    }),
+    span_resolver=ConfidenceSpanConflictResolver(),
+    entity_linker=ExactEntityLinker(),
+    entity_resolver=MergeEntityConflictResolver(),
+    anonymizer=Anonymizer(CounterPlaceholderFactory()),
+)
+```
+
+**With GLiNER2 (requires `piighost[gliner2]`):**
 
 ```python
 from gliner2 import GLiNER2
 from piighost.anonymizer import Anonymizer
 from piighost.detector.gliner2 import Gliner2Detector
-from piighost.linker.entity import ExactEntityLinker
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
 from piighost.placeholder import CounterPlaceholderFactory
 from piighost.resolver.entity import MergeEntityConflictResolver
@@ -36,12 +60,7 @@ from piighost.resolver.span import ConfidenceSpanConflictResolver
 model = GLiNER2.from_pretrained("fastino/gliner2-multi-v1")
 
 pipeline = ThreadAnonymizationPipeline(
-    detector=Gliner2Detector(
-        model=model,
-        labels=["PERSON", "LOCATION"],
-        threshold=0.5,
-        flat_ner=True,
-    ),
+    detector=Gliner2Detector(model=model, labels=["PERSON", "LOCATION"], threshold=0.5),
     span_resolver=ConfidenceSpanConflictResolver(),
     entity_linker=ExactEntityLinker(),
     entity_resolver=MergeEntityConflictResolver(),
@@ -55,15 +74,18 @@ pipeline = ThreadAnonymizationPipeline(
 # docker-compose.yml
 services:
   api:
-    build: .
+    image: ghcr.io/athroniaeth/piighost-api:latest
     ports:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379
       - SECRET_PEPPER=${SECRET_PEPPER}
       - API_KEY_default=${API_KEY}
+      # Install optional extras at startup (e.g. for GLiNER2 pipeline)
+      - EXTRA_PACKAGES=piighost[gliner2]
     volumes:
       - ./pipeline.py:/app/pipeline.py
+      - huggingface-cache:/root/.cache/huggingface
     depends_on:
       - redis
 
@@ -76,10 +98,24 @@ services:
 
 volumes:
   redis-data:
+  huggingface-cache:
 ```
 
 ```bash
-docker compose up --build
+docker compose up
+```
+
+#### Installing extra dependencies
+
+**At runtime** (pre-built image, installs on each startup):
+```yaml
+environment:
+  - EXTRA_PACKAGES=piighost[gliner2]
+```
+
+**At build time** (custom image, baked in):
+```bash
+docker build --build-arg PIIGHOST_EXTRAS="gliner2,faker" -t my-piighost-api .
 ```
 
 > If no valid `API_KEY_*` environment variables are set, the server starts with authentication **disabled** (a warning is logged).
@@ -224,10 +260,10 @@ sequenceDiagram
     participant F as Frontend / Backend
     participant A as piighost-api
     participant R as Redis
-    participant M as NER Model
+    participant M as Detector (regex / NER)
 
     F->>A: POST /v1/anonymize
-    A->>M: detect entities (GLiNER2)
+    A->>M: detect entities
     A->>R: cache mapping
     A->>F: anonymized text + entities
 
@@ -240,7 +276,7 @@ sequenceDiagram
 
 ## Ecosystem
 
-- **[piighost](https://github.com/Athroniaeth/piighost)** — Core PII anonymization library with GLiNER2 NER, regex detectors, entity linking, and LangChain middleware.
+- **[piighost](https://github.com/Athroniaeth/piighost)** — Core PII anonymization library with regex detectors, optional NER (GLiNER2, spaCy, transformers), entity linking, and LangChain middleware.
 - **[piighost-chat](https://github.com/Athroniaeth/piighost-chat)** — Demo chat app using this API for real-time PII detection and a LangChain agent with `PIIAnonymizationMiddleware` for privacy-preserving AI conversations.
 
 ## Development
