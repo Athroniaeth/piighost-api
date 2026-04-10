@@ -1,3 +1,9 @@
+## 0.4.1 (2026-04-10)
+
+### Fix
+
+- use uv pip install instead of pip in entrypoint
+
 ## 0.4.0 (2026-04-07)
 
 ### Feat
