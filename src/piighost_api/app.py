@@ -9,12 +9,12 @@ import msgspec
 from keyshield import ApiKeyService
 from keyshield.hasher.argon2 import Argon2ApiKeyHasher
 from keyshield.repositories.in_memory import InMemoryApiKeyRepository
-from litestar import Litestar, get, post
+from litestar import Litestar, get, post, put
 from litestar.exceptions import NotFoundException
 from litestar.openapi import OpenAPIConfig
 
 from piighost.exceptions import CacheMissError
-from piighost.models import Entity
+from piighost.models import Detection, Entity, Span
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import create_auth_guard
@@ -26,16 +26,6 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 # msgspec request/response structs
 # ------------------------------------------------------------------
-
-
-class AnonymizeRequest(msgspec.Struct):
-    text: str
-    thread_id: str = "default"
-
-
-class DeanonymizeRequest(msgspec.Struct):
-    text: str
-    thread_id: str = "default"
 
 
 class DetectionSchema(msgspec.Struct):
@@ -52,6 +42,27 @@ class EntitySchema(msgspec.Struct):
     detections: list[DetectionSchema]
 
 
+class DetectRequest(msgspec.Struct):
+    text: str
+    thread_id: str = "default"
+
+
+class OverrideDetectRequest(msgspec.Struct):
+    text: str
+    thread_id: str = "default"
+    detections: list[DetectionSchema]
+
+
+class AnonymizeRequest(msgspec.Struct):
+    text: str
+    thread_id: str = "default"
+
+
+class DeanonymizeRequest(msgspec.Struct):
+    text: str
+    thread_id: str = "default"
+
+
 class AnonymizeResponse(msgspec.Struct):
     anonymized_text: str
     entities: list[EntitySchema]
@@ -59,6 +70,10 @@ class AnonymizeResponse(msgspec.Struct):
 
 class DeanonymizeResponse(msgspec.Struct):
     text: str
+    entities: list[EntitySchema]
+
+
+class DetectResponse(msgspec.Struct):
     entities: list[EntitySchema]
 
 
@@ -119,6 +134,26 @@ def _serialize_entities(
             EntitySchema(
                 label=entity.label, placeholder=placeholder, detections=detections
             )
+        )
+    return result
+
+
+def _serialize_entities_plain(entities: list[Entity]) -> list[EntitySchema]:
+    """Serialize entities without placeholder tokens (for detection preview)."""
+    result: list[EntitySchema] = []
+    for entity in entities:
+        detections = [
+            DetectionSchema(
+                text=d.text,
+                label=d.label,
+                start_pos=d.position.start_pos,
+                end_pos=d.position.end_pos,
+                confidence=d.confidence,
+            )
+            for d in entity.detections
+        ]
+        result.append(
+            EntitySchema(label=entity.label, placeholder="", detections=detections)
         )
     return result
 
@@ -193,6 +228,31 @@ def create_app(pipeline_path: str) -> Litestar:
             placeholder_factory=factory_name,
         )
 
+    @post("/v1/detect")
+    async def detect(data: DetectRequest) -> DetectResponse:
+        pipeline._thread_id = data.thread_id
+        entities = await pipeline.detect_entities(data.text)
+        return DetectResponse(
+            entities=_serialize_entities_plain(entities),
+        )
+
+    @put("/v1/detect")
+    async def override_detect(data: OverrideDetectRequest) -> None:
+        detections = [
+            Detection(
+                text=d.text,
+                label=d.label,
+                position=Span(d.start_pos, d.end_pos),
+                confidence=d.confidence,
+            )
+            for d in data.detections
+        ]
+        await pipeline.override_detections(
+            data.text,
+            detections,
+            thread_id=data.thread_id,
+        )
+
     @post("/v1/anonymize")
     async def anonymize(data: AnonymizeRequest) -> AnonymizeResponse:
         anonymized_text, entities = await pipeline.anonymize(
@@ -240,6 +300,8 @@ def create_app(pipeline_path: str) -> Litestar:
             index,
             health,
             get_config,
+            detect,
+            override_detect,
             anonymize,
             deanonymize,
             deanonymize_entities,
