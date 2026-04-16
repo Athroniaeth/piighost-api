@@ -1,3 +1,13 @@
+## 0.5.0 (2026-04-16)
+
+### Feat
+
+- add POST /v1/detect and PUT /v1/detect routes for entity correction
+
+### Fix
+
+- reorder OverrideDetectRequest fields to satisfy msgspec ordering
+
 ## 0.4.1 (2026-04-10)
 
 ### Fix
