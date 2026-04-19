@@ -1,3 +1,9 @@
+## 0.5.2 (2026-04-20)
+
+### Fix
+
+- allow uv wheel cache to persist across runtime installs
+
 ## 0.5.1 (2026-04-16)
 
 ## 0.5.0 (2026-04-16)
