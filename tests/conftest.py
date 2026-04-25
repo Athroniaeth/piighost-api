@@ -8,7 +8,7 @@ from litestar import Litestar
 from litestar.testing import TestClient
 
 from piighost.models import Detection, Entity, Span
-from piighost.placeholder import CounterPlaceholderFactory
+from piighost.placeholder import LabelCounterPlaceholderFactory
 
 
 def _make_entity(
@@ -48,7 +48,7 @@ def mock_pipeline() -> MagicMock:
 
     pipeline.anonymize = AsyncMock(
         return_value=(
-            "<<PERSON_1>> habite à <<LOCATION_1>>",
+            "<<PERSON:1>> habite à <<LOCATION:1>>",
             [ENTITY_PERSON, ENTITY_LOCATION],
         )
     )
@@ -61,7 +61,7 @@ def mock_pipeline() -> MagicMock:
         return_value=[ENTITY_PERSON, ENTITY_LOCATION]
     )
 
-    ph_factory = CounterPlaceholderFactory()
+    ph_factory = LabelCounterPlaceholderFactory()
     pipeline.ph_factory = ph_factory
 
     pipeline._detector = MagicMock()

@@ -6,7 +6,7 @@ from litestar.testing import TestClient
 
 from piighost.exceptions import CacheMissError
 from piighost.models import Detection, Entity, Span
-from piighost.placeholder import CounterPlaceholderFactory
+from piighost.placeholder import LabelCounterPlaceholderFactory
 
 from piighost_api.app import _get_detector_labels, _serialize_entities
 
@@ -55,7 +55,7 @@ def test_get_config(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["labels"] == ["PERSON", "LOCATION"]
-    assert data["placeholder_factory"] == "CounterPlaceholderFactory"
+    assert data["placeholder_factory"] == "LabelCounterPlaceholderFactory"
 
 
 def test_get_config_no_labels(mock_pipeline: MagicMock, client: TestClient) -> None:
@@ -77,10 +77,10 @@ def test_anonymize(client: TestClient) -> None:
     )
     assert response.status_code == 201
     data = response.json()
-    assert data["anonymized_text"] == "<<PERSON_1>> habite à <<LOCATION_1>>"
+    assert data["anonymized_text"] == "<<PERSON:1>> habite à <<LOCATION:1>>"
     assert len(data["entities"]) == 2
     assert data["entities"][0]["label"] == "PERSON"
-    assert data["entities"][0]["placeholder"] == "<<PERSON_1>>"
+    assert data["entities"][0]["placeholder"] == "<<PERSON:1>>"
     assert data["entities"][0]["detections"][0]["text"] == "Patrick"
 
 
@@ -104,7 +104,7 @@ def test_anonymize_custom_thread_id(
 def test_deanonymize(client: TestClient) -> None:
     response = client.post(
         "/v1/deanonymize",
-        json={"text": "<<PERSON_1>> habite à <<LOCATION_1>>"},
+        json={"text": "<<PERSON:1>> habite à <<LOCATION:1>>"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -116,7 +116,7 @@ def test_deanonymize_cache_miss(mock_pipeline: MagicMock, client: TestClient) ->
     mock_pipeline.deanonymize = AsyncMock(side_effect=CacheMissError("not found"))
     response = client.post(
         "/v1/deanonymize",
-        json={"text": "<<PERSON_1>> inconnu"},
+        json={"text": "<<PERSON:1>> inconnu"},
     )
     assert response.status_code == 404
 
@@ -129,7 +129,7 @@ def test_deanonymize_cache_miss(mock_pipeline: MagicMock, client: TestClient) ->
 def test_deanonymize_entities(client: TestClient) -> None:
     response = client.post(
         "/v1/deanonymize/entities",
-        json={"text": "<<PERSON_1>> aime <<LOCATION_1>>"},
+        json={"text": "<<PERSON:1>> aime <<LOCATION:1>>"},
     )
     assert response.status_code == 201
     assert response.json()["text"] == "Patrick aime Paris"
@@ -144,8 +144,8 @@ def test_serialize_entities(mock_pipeline: MagicMock) -> None:
     entities = [ENTITY_PERSON, ENTITY_LOCATION]
     result = _serialize_entities(entities, mock_pipeline, "default")
     assert len(result) == 2
-    assert result[0].placeholder == "<<PERSON_1>>"
-    assert result[1].placeholder == "<<LOCATION_1>>"
+    assert result[0].placeholder == "<<PERSON:1>>"
+    assert result[1].placeholder == "<<LOCATION:1>>"
     assert result[0].detections[0].text == "Patrick"
 
 
@@ -173,7 +173,7 @@ def test_lifespan_auth_success() -> None:
     mock_pipeline = MagicMock()
     mock_pipeline._detector = MagicMock()
     mock_pipeline._detector.labels = ["PERSON"]
-    mock_pipeline.ph_factory = CounterPlaceholderFactory()
+    mock_pipeline.ph_factory = LabelCounterPlaceholderFactory()
     mock_pipeline.anonymize = AsyncMock(return_value=("anon", []))
     mock_pipeline.get_resolved_entities = MagicMock(return_value=[])
 
@@ -197,7 +197,7 @@ def test_lifespan_auth_failure() -> None:
     mock_pipeline = MagicMock()
     mock_pipeline._detector = MagicMock()
     mock_pipeline._detector.labels = ["PERSON"]
-    mock_pipeline.ph_factory = CounterPlaceholderFactory()
+    mock_pipeline.ph_factory = LabelCounterPlaceholderFactory()
     mock_pipeline.anonymize = AsyncMock(return_value=("anon", []))
     mock_pipeline.get_resolved_entities = MagicMock(return_value=[])
 
