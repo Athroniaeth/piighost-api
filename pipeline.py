@@ -13,7 +13,7 @@ from piighost.anonymizer import Anonymizer
 from piighost.detector import CompositeDetector, RegexDetector
 from piighost.linker.entity import ExactEntityLinker
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
-from piighost.placeholder import CounterPlaceholderFactory
+from piighost.placeholder import LabelCounterPlaceholderFactory
 from piighost.resolver import (
     ConfidenceSpanConflictResolver,
     MergeEntityConflictResolver,
@@ -121,7 +121,7 @@ entity_linker = ExactEntityLinker()
 entity_resolver = MergeEntityConflictResolver()
 span_resolver = ConfidenceSpanConflictResolver()
 
-ph_factory = CounterPlaceholderFactory()
+ph_factory = LabelCounterPlaceholderFactory()
 anonymizer = Anonymizer(ph_factory=ph_factory)
 
 pipeline = ThreadAnonymizationPipeline(

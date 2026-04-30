@@ -19,6 +19,7 @@ from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import create_auth_guard
 from piighost_api.loader import load_pipeline
+from piighost_api.observation import load_observation_service
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +182,11 @@ def create_app(pipeline_path: str) -> Litestar:
         A fully configured ``Litestar`` instance.
     """
     pipeline = load_pipeline(pipeline_path)
+
+    observation = load_observation_service()
+    if observation is not None:
+        pipeline._observation = observation
+        logger.info("Observation enabled: %s", type(observation).__name__)
 
     pepper = os.getenv("SECRET_PEPPER")
     hasher = Argon2ApiKeyHasher(pepper=pepper)

@@ -29,7 +29,7 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "piighost>=0.5",
+    "piighost>=0.10",
     "keyshield[argon2]>=2.0",
     "litestar>=2.16",
     "uvicorn>=0.34",
@@ -37,6 +37,10 @@ dependencies = [
     "msgspec>=0.19",
     "requests>=2.32",
 ]
+
+[project.optional-dependencies]
+langfuse = ["piighost[langfuse]"]
+opik = ["piighost[opik]"]
 
 [project.urls]
 Homepage = "https://github.com/Athroniaeth/piighost-api"

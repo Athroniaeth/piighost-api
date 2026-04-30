@@ -11,6 +11,12 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - SECRET_PEPPER=${SECRET_PEPPER}
       - API_KEY_default=${API_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
+      - OPIK_API_KEY=${OPIK_API_KEY:-}
+      - OPIK_WORKSPACE=${OPIK_WORKSPACE:-}
+      - EXTRA_PACKAGES=${EXTRA_PACKAGES:-}
     volumes:
       - ./pipeline.py:/app/pipeline.py
       - huggingface-cache:/root/.cache/huggingface
