@@ -1,3 +1,9 @@
+## 0.6.0 (2026-04-30)
+
+### Feat
+
+- add optional Langfuse/Opik observation backends
+
 ## 0.5.3 (2026-04-26)
 
 ## 0.5.2 (2026-04-20)
