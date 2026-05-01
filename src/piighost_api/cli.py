@@ -88,7 +88,20 @@ def dataset_extract(
         )
         raise typer.Exit(code=1)
 
-    from langfuse import Langfuse  # imported lazily so `--help` works without the extra
+    # Lazy import so the whole `--help` command tree works when the
+    # `dataset` extra is not installed. The friendly error below
+    # converts the ModuleNotFoundError into the same shape as the
+    # missing-credentials branch above, instead of a raw traceback.
+    try:
+        from langfuse import Langfuse
+    except ModuleNotFoundError:
+        typer.echo(
+            "The 'langfuse' package is required for `dataset extract`. "
+            "Install it with `uv sync --extra dataset` "
+            "(or `pip install langfuse>=3.0`).",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
     client = Langfuse()
     fetch_kwargs: dict = {}
