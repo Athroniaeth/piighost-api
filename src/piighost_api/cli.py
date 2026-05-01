@@ -93,7 +93,7 @@ def dataset_extract(
     # converts the ModuleNotFoundError into the same shape as the
     # missing-credentials branch above, instead of a raw traceback.
     try:
-        from langfuse import Langfuse
+        from langfuse import Langfuse  # pyrefly: ignore[missing-import]
     except ModuleNotFoundError:
         typer.echo(
             "The 'langfuse' package is required for `dataset extract`. "
