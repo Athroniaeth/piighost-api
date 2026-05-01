@@ -1460,6 +1460,7 @@ dependencies = [
 [package.optional-dependencies]
 dataset = [
     { name = "langfuse" },
+    { name = "python-dotenv" },
 ]
 langfuse = [
     { name = "piighost", extra = ["langfuse"] },
@@ -1488,6 +1489,7 @@ requires-dist = [
     { name = "piighost", specifier = ">=0.10" },
     { name = "piighost", extras = ["langfuse"], marker = "extra == 'langfuse'" },
     { name = "piighost", extras = ["opik"], marker = "extra == 'opik'" },
+    { name = "python-dotenv", marker = "extra == 'dataset'", specifier = ">=1.0" },
     { name = "requests", specifier = ">=2.32" },
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", specifier = ">=0.34" },

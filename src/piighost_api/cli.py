@@ -80,6 +80,18 @@ def dataset_extract(
     limit: int | None = typer.Option(None, "--limit", help="Stop after N records."),
 ) -> None:
     """Extract HITL + non-HITL traces from Langfuse into a JSONL dataset."""
+    # Auto-load a .env from the current working directory if python-dotenv
+    # is available. Operators typically keep their LANGFUSE_* keys in the
+    # repo's .env (the dev-mode workflow already sources it for `make
+    # docker-up*`), and a CLI run from the repo root should pick that up
+    # without forcing the user to `set -a && source .env && set +a`.
+    try:
+        from dotenv import load_dotenv  # pyrefly: ignore[missing-import]
+
+        load_dotenv()
+    except ModuleNotFoundError:
+        pass
+
     if not os.getenv("LANGFUSE_PUBLIC_KEY") or not os.getenv("LANGFUSE_SECRET_KEY"):
         typer.echo(
             "Missing LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY. "

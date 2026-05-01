@@ -44,8 +44,10 @@ langfuse = ["piighost[langfuse]"]
 opik = ["piighost[opik]"]
 # Dataset CLI dependencies. Pulls the Langfuse SDK so the
 # ``piighost-api dataset extract`` command can talk to the observation
-# backend directly.
-dataset = ["langfuse>=3.0"]
+# backend directly. python-dotenv lets the CLI auto-load a .env from
+# the current working directory so the operator doesn't have to source
+# it manually before each run.
+dataset = ["langfuse>=3.0", "python-dotenv>=1.0"]
 
 [project.urls]
 Homepage = "https://github.com/Athroniaeth/piighost-api"
