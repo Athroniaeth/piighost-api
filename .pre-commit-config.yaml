@@ -1,0 +1,15 @@
+# Hook config for prek (https://github.com/j178/prek), the Rust drop-in
+# for pre-commit. Install with `make hooks`.
+repos:
+  - repo: local
+    hooks:
+      - id: piighost-lock-pypi-mode
+        name: uv.lock has piighost from PyPI (run `make install-pypi`)
+        # `uv lock --locked --no-sources` resolves the lockfile while
+        # ignoring the [tool.uv.sources] path override. If the current
+        # lockfile records piighost as an editable file:// source, the
+        # check exits non-zero and the commit is blocked.
+        entry: uv lock --locked --no-sources
+        language: system
+        files: ^(uv\.lock|pyproject\.toml)$
+        pass_filenames: false
