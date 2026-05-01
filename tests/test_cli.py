@@ -62,7 +62,10 @@ def test_dataset_metrics_help() -> None:
     assert "--source" in result.stdout
 
 
-def test_dataset_extract_missing_credentials_exits_one() -> None:
+def test_dataset_extract_missing_credentials_exits_one(tmp_path, monkeypatch) -> None:
+    # chdir into a temp dir so the CLI's load_dotenv() does not pick up
+    # the repo's real .env (which would defeat the missing-creds assertion).
+    monkeypatch.chdir(tmp_path)
     with patch.dict(os.environ, {}, clear=True):
         result = runner.invoke(
             app, ["dataset", "extract", "--output", "/tmp/should-not-exist.jsonl"]
