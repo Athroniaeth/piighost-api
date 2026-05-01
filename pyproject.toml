@@ -36,11 +36,16 @@ dependencies = [
     "aiocache>=0.12",
     "msgspec>=0.19",
     "requests>=2.32",
+    "typer>=0.12",
 ]
 
 [project.optional-dependencies]
 langfuse = ["piighost[langfuse]"]
 opik = ["piighost[opik]"]
+# Dataset CLI dependencies. Pulls the Langfuse SDK so the
+# ``piighost-api dataset extract`` command can talk to the observation
+# backend directly.
+dataset = ["langfuse>=3.0"]
 
 [project.urls]
 Homepage = "https://github.com/Athroniaeth/piighost-api"

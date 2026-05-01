@@ -1453,10 +1453,14 @@ dependencies = [
     { name = "msgspec" },
     { name = "piighost" },
     { name = "requests" },
+    { name = "typer" },
     { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
+dataset = [
+    { name = "langfuse" },
+]
 langfuse = [
     { name = "piighost", extra = ["langfuse"] },
 ]
@@ -1478,15 +1482,17 @@ dev = [
 requires-dist = [
     { name = "aiocache", specifier = ">=0.12" },
     { name = "keyshield", extras = ["argon2"], specifier = ">=2.0" },
+    { name = "langfuse", marker = "extra == 'dataset'", specifier = ">=3.0" },
     { name = "litestar", specifier = ">=2.16" },
     { name = "msgspec", specifier = ">=0.19" },
     { name = "piighost", specifier = ">=0.10" },
     { name = "piighost", extras = ["langfuse"], marker = "extra == 'langfuse'" },
     { name = "piighost", extras = ["opik"], marker = "extra == 'opik'" },
     { name = "requests", specifier = ">=2.32" },
+    { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", specifier = ">=0.34" },
 ]
-provides-extras = ["langfuse", "opik"]
+provides-extras = ["langfuse", "opik", "dataset"]
 
 [package.metadata.requires-dev]
 dev = [
