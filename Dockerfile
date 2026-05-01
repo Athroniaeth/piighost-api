@@ -8,12 +8,16 @@ RUN pip install --no-cache-dir uv
 # Copy project metadata and install dependencies
 COPY pyproject.toml uv.lock* README.md ./
 
-# Install dependencies (torch resolves to CPU-only via tool.uv.sources)
-RUN uv sync --frozen --no-dev --no-progress || uv sync --no-dev --no-progress
+# Install dependencies. --no-sources ignores the local-dev path override
+# in pyproject.toml (which points piighost at the sibling ../piighost
+# checkout used during host development) and pulls piighost from PyPI.
+# torch CPU-only resolution still works because torch's source uses an
+# index pin, not a path override.
+RUN uv sync --frozen --no-dev --no-progress --no-sources || uv sync --no-dev --no-progress --no-sources
 
 # Copy source code and install the project itself
 COPY src src
-RUN uv sync --frozen --no-dev --no-progress
+RUN uv sync --frozen --no-dev --no-progress --no-sources
 
 # Optional: install extra piighost extras at build time
 # Usage: docker build --build-arg PIIGHOST_EXTRAS="gliner2,faker" .

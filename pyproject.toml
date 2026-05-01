@@ -74,6 +74,10 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
+# Local-dev override: when the sibling ../piighost checkout exists, uv
+# installs piighost editable from there. Production / CI / Docker builds
+# pass `--no-sources` to ignore this and pull piighost from PyPI instead.
+piighost = { path = "../piighost", editable = true }
 
 [dependency-groups]
 dev = [
