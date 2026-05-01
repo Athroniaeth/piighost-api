@@ -8,16 +8,20 @@ RUN pip install --no-cache-dir uv
 # Copy project metadata and install dependencies
 COPY pyproject.toml uv.lock* README.md ./
 
-# Install dependencies. --no-sources ignores the local-dev path override
-# in pyproject.toml (which points piighost at the sibling ../piighost
-# checkout used during host development) and pulls piighost from PyPI.
-# torch CPU-only resolution still works because torch's source uses an
-# index pin, not a path override.
-RUN uv sync --frozen --no-dev --no-progress --no-sources || uv sync --no-dev --no-progress --no-sources
+# Install dependencies from the lockfile. The committed lockfile is
+# kept in PyPI mode (the prek hook in .pre-commit-config.yaml blocks
+# editable-source lockfiles from landing on master), so --frozen alone
+# already pulls piighost from PyPI inside the image. The fallback path
+# is for the rare case the lockfile is missing or out of sync; it
+# re-resolves from indexes and uses --no-sources to bypass the local
+# ../piighost path override declared in pyproject.toml. uv rejects
+# --frozen with --no-sources, so the two flags only coexist on the
+# fallback branch.
+RUN uv sync --frozen --no-dev --no-progress || uv sync --no-dev --no-progress --no-sources
 
 # Copy source code and install the project itself
 COPY src src
-RUN uv sync --frozen --no-dev --no-progress --no-sources
+RUN uv sync --frozen --no-dev --no-progress
 
 # Optional: install extra piighost extras at build time
 # Usage: docker build --build-arg PIIGHOST_EXTRAS="gliner2,faker" .
