@@ -4,11 +4,12 @@ repos:
   - repo: local
     hooks:
       - id: piighost-lock-pypi-mode
-        name: uv.lock has piighost from PyPI (run `make install-pypi`)
-        # `uv lock --locked --no-sources` resolves the lockfile while
-        # ignoring the [tool.uv.sources] path override. If the current
-        # lockfile records piighost as an editable file:// source, the
-        # check exits non-zero and the commit is blocked.
+        name: uv.lock has piighost from PyPI (run `make install`)
+        # ``uv lock --locked --no-sources`` resolves the lockfile while
+        # ignoring any [tool.uv.sources] override. If a developer ran
+        # ``make dev-local`` (which layers an editable piighost over
+        # the PyPI sync) and a stray ``uv sync`` mutated the lockfile,
+        # the check exits non-zero and the commit is blocked.
         entry: uv lock --locked --no-sources
         language: system
         files: ^(uv\.lock|pyproject\.toml)$
