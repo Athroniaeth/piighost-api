@@ -17,7 +17,7 @@ install:
 # PyPI instead of the local checkout. Use this before committing the
 # lockfile, or to reproduce the production install on the host.
 install-pypi:
-	uv sync --no-sources
+	uv sync --no-sources --upgrade
 
 # Install the prek-managed git hook that blocks a commit when uv.lock
 # records piighost as a local editable source. Requires prek on PATH
