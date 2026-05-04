@@ -8,16 +8,9 @@ RUN pip install --no-cache-dir uv
 # Copy project metadata and install dependencies
 COPY pyproject.toml uv.lock* README.md ./
 
-# Install dependencies from the lockfile. The committed lockfile is
-# kept in PyPI mode (the prek hook in .pre-commit-config.yaml blocks
-# editable-source lockfiles from landing on master), so --frozen alone
-# already pulls piighost from PyPI inside the image. The fallback path
-# is for the rare case the lockfile is missing or out of sync; it
-# re-resolves from indexes and uses --no-sources to bypass the local
-# ../piighost path override declared in pyproject.toml. uv rejects
-# --frozen with --no-sources, so the two flags only coexist on the
-# fallback branch.
-RUN uv sync --frozen --no-dev --no-progress || uv sync --no-dev --no-progress --no-sources
+# Install dependencies from the lockfile. piighost resolves from PyPI
+# in the committed pyproject; no path override to bypass anymore.
+RUN uv sync --frozen --no-dev --no-progress || uv sync --no-dev --no-progress
 
 # Copy source code and install the project itself
 COPY src src

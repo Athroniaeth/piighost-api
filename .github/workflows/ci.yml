@@ -25,12 +25,7 @@ jobs:
           key: ${{ runner.os }}-uv-3.13-${{ hashFiles('uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-uv-3.13-
-      # --no-sources ignores the [tool.uv.sources] path override that
-      # points piighost at ../piighost for local-dev mode. The CI runner
-      # has no sibling checkout, so without this flag uv tries to resolve
-      # piighost from a non-existent file:// path. The Dockerfile uses
-      # the same flag for the same reason.
-      - run: uv sync --locked --dev --no-progress -q --no-sources
+      - run: uv sync --locked --dev --no-progress -q
       - run: make lint
 
   tests:
@@ -52,10 +47,5 @@ jobs:
           key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
             ${{ runner.os }}-uv-${{ matrix.python-version }}-
-      # --no-sources ignores the [tool.uv.sources] path override that
-      # points piighost at ../piighost for local-dev mode. The CI runner
-      # has no sibling checkout, so without this flag uv tries to resolve
-      # piighost from a non-existent file:// path. The Dockerfile uses
-      # the same flag for the same reason.
-      - run: uv sync --locked --dev --no-progress -q --no-sources
+      - run: uv sync --locked --dev --no-progress -q
       - run: uv run pytest

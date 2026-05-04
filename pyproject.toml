@@ -81,10 +81,11 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
-# Local-dev override: when the sibling ../piighost checkout exists, uv
-# installs piighost editable from there. Production / CI / Docker builds
-# pass `--no-sources` to ignore this and pull piighost from PyPI instead.
-piighost = { path = "../piighost", editable = true }
+# piighost is intentionally NOT pinned to a sibling path here. The
+# committed config resolves piighost from PyPI so CI, Docker, and
+# fresh clones all work without flags. For local dev that picks up
+# in-flight changes from ../piighost, run ``make dev-local`` which
+# adds the editable install on top of the PyPI sync. See the Makefile.
 
 [dependency-groups]
 dev = [

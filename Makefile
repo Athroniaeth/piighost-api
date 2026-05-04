@@ -1,4 +1,4 @@
-.PHONY: lint test docker-up docker-down install install-pypi hooks
+.PHONY: lint test docker-up docker-down install dev-local hooks
 
 lint:
 	-uv run ruff format .
@@ -8,20 +8,25 @@ lint:
 test:
 	uv run pytest
 
-# Default dev install. Pyproject's [tool.uv.sources] points piighost at
-# ../piighost (editable), so source changes there are picked up live.
+# Default install: piighost from PyPI as recorded in uv.lock. Works
+# out of the box with no flags; CI, Docker, and fresh clones all use
+# this path.
 install:
 	uv sync
 
-# Same as install but ignores pyproject sources, so piighost comes from
-# PyPI instead of the local checkout. Use this before committing the
-# lockfile, or to reproduce the production install on the host.
-install-pypi:
-	uv sync --no-sources --upgrade
+# Local-dev install. Layers an editable install of the sibling
+# ../piighost on top of `uv sync`, so in-flight library changes are
+# picked up without a republish. Caveat: any subsequent `uv sync` (or
+# `uv run`, which auto-syncs) reinstalls piighost from PyPI and
+# undoes the editable. Re-run this target after such a sync.
+dev-local: install
+	uv pip install -e ../piighost --reinstall-package piighost
 
 # Install the prek-managed git hook that blocks a commit when uv.lock
-# records piighost as a local editable source. Requires prek on PATH
-# (`uv tool install prek`).
+# would record piighost as a local editable source. Defense in depth:
+# if a developer accidentally edited the lockfile via ``uv sync`` after
+# a manual editable install, the hook catches it before push. Requires
+# prek on PATH (``uv tool install prek``).
 hooks:
 	prek install
 
