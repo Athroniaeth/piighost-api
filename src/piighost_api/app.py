@@ -15,7 +15,7 @@ from litestar.openapi import OpenAPIConfig
 
 from piighost.exceptions import CacheMissError
 from piighost.models import Detection, Entity, Span
-from piighost.pipeline.thread import ThreadAnonymizationPipeline
+from piighost.pipeline.thread import ThreadAnonymizationPipeline, _current_thread_id
 
 from piighost_api.auth import create_auth_guard
 from piighost_api.loader import load_pipeline
@@ -236,8 +236,16 @@ def create_app(pipeline_path: str) -> Litestar:
 
     @post("/v1/detect")
     async def detect(data: DetectRequest) -> DetectResponse:
-        pipeline._thread_id = data.thread_id
-        entities = await pipeline.detect_entities(data.text)
+        # detect_entities does not yet accept a thread_id kwarg, so we
+        # set the lib's ContextVar manually for the duration of the call.
+        # The ContextVar is what _cached_detect reads to compute the
+        # cache key; without this, every request would share the
+        # "default" thread bucket.
+        token = _current_thread_id.set(data.thread_id)
+        try:
+            entities = await pipeline.detect_entities(data.text)
+        finally:
+            _current_thread_id.reset(token)
         return DetectResponse(
             entities=_serialize_entities_plain(entities),
         )
