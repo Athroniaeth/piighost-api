@@ -1,3 +1,19 @@
+## 0.7.0 (2026-05-04)
+
+### Feat
+
+- **cli**: auto-load .env in dataset extract via python-dotenv
+- **cli**: migrate to Typer and add 'dataset extract|metrics' subcommands
+- **dataset**: add JSONL -> per-label P/R/F1 metrics primitives
+- **dataset**: add Langfuse trace -> JSONL record shaping
+- **deps**: add typer base dep and dataset extra (langfuse SDK)
+
+### Fix
+
+- **tests**: isolate dataset_extract missing-creds test from repo .env
+- **cli**: friendly error when 'dataset' extra is not installed
+- **docker**: drop conflicting --frozen + --no-sources combo
+
 ## 0.6.0 (2026-04-30)
 
 ### Feat
