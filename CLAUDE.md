@@ -9,12 +9,28 @@ piighost-api is a REST API server for [piighost](https://github.com/Athroniaeth/
 ## Development Commands
 
 ```bash
-uv sync                      # Install dependencies
+make install                 # uv sync (PyPI: default install path)
+make dev-local               # uv sync + uv pip install -e ../piighost (editable lib)
 make lint                    # Format (ruff), lint (ruff), type-check (pyrefly)
 make test                    # Run all tests
 make docker-up               # Start Docker services (API + Redis)
 make docker-down             # Stop Docker services
+make hooks                   # Install the prek pre-commit hook (run once per clone)
 ```
+
+## Install workflow (PyPI default, dev-local opt-in)
+
+The committed `pyproject.toml` resolves `piighost` from PyPI; the lockfile records `source = { registry = "https://pypi.org/simple" }`. CI, Docker, and fresh clones all use the standard path with no flags.
+
+When iterating on the sibling `~/PycharmProjects/piighost` lib **without** publishing a release:
+
+1. `make install` once (or after pulling) to install the published baseline.
+2. `make dev-local` to layer an editable install of `../piighost` on top. From this point on, source changes in the lib are picked up live by this server.
+3. **Caveat**: any subsequent `uv sync` or `uv run` (which auto-syncs from the lockfile) reinstalls piighost from PyPI and undoes the editable. Re-run `make dev-local` if that happens. Set `UV_NO_SYNC=1` in your shell to silence the auto-sync if you want a stickier setup.
+
+The `prek` hook installed via `make hooks` runs `uv lock --locked --no-sources` on every commit touching `uv.lock` or `pyproject.toml`. It blocks commits whose lockfile records `piighost` as a `file://` editable source — defense-in-depth against accidentally shipping a dev-mode lockfile.
+
+There is no need to `cz bump` and publish to PyPI just to test changes against this server. Bumping is reserved for actual external releases.
 
 ## Architecture
 
