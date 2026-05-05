@@ -1,6 +1,7 @@
 """Tests for cli.py — Typer-based multi-subcommand entrypoint."""
 
 import os
+import re
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -9,6 +10,20 @@ from piighost_api.cli import _create_app, app
 
 
 runner = CliRunner()
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def _plain(text: str) -> str:
+    """Strip ANSI escape sequences and collapse whitespace.
+
+    Typer renders help output via Rich, which emits bold sequences
+    (and may wrap option names across lines on narrow CI terminals).
+    Tests need to assert that an option name appears, regardless of
+    styling or wrapping.
+    """
+    return re.sub(r"\s+", " ", _ANSI_RE.sub("", text))
 
 
 def test_no_command_prints_help_and_exits_zero() -> None:
@@ -49,17 +64,19 @@ def test_serve_sets_env_and_runs_uvicorn() -> None:
 def test_dataset_extract_help() -> None:
     result = runner.invoke(app, ["dataset", "extract", "--help"])
     assert result.exit_code == 0
-    assert "--output" in result.stdout
-    assert "--since" in result.stdout
-    assert "--mode" in result.stdout
+    out = _plain(result.stdout)
+    assert "--output" in out
+    assert "--since" in out
+    assert "--mode" in out
 
 
 def test_dataset_metrics_help() -> None:
     result = runner.invoke(app, ["dataset", "metrics", "--help"])
     assert result.exit_code == 0
-    assert "--input" in result.stdout
-    assert "--match-mode" in result.stdout
-    assert "--source" in result.stdout
+    out = _plain(result.stdout)
+    assert "--input" in out
+    assert "--match-mode" in out
+    assert "--source" in out
 
 
 def test_dataset_extract_missing_credentials_exits_one(tmp_path, monkeypatch) -> None:
