@@ -4,13 +4,17 @@ repos:
   - repo: local
     hooks:
       - id: piighost-lock-pypi-mode
-        name: uv.lock has piighost from PyPI (run `make install`)
-        # ``uv lock --locked --no-sources`` resolves the lockfile while
-        # ignoring any [tool.uv.sources] override. If a developer ran
-        # ``make dev-local`` (which layers an editable piighost over
-        # the PyPI sync) and a stray ``uv sync`` mutated the lockfile,
-        # the check exits non-zero and the commit is blocked.
-        entry: uv lock --locked --no-sources
+        name: auto-flip uv.lock to PyPI mode (re-stages if changed)
+        # Auto-fix mode: regenerate the lockfile with --no-sources so any
+        # editable file:// piighost source is replaced by the PyPI
+        # registry equivalent, then re-stage. The commit always lands a
+        # PyPI-mode lockfile regardless of the developer's local state
+        # (e.g. after ``make dev-local`` flipped the lock to editable).
+        # This used to be a check-only hook that exit 1 and blocked the
+        # commit; in that mode prek's stash/restore around the failing
+        # hook occasionally lost unstaged modifs in
+        # ~/.cache/prek/patches/. Auto-fix avoids the failure path.
+        entry: bash -c 'uv lock --no-sources --quiet && git add uv.lock'
         language: system
         files: ^(uv\.lock|pyproject\.toml)$
         pass_filenames: false
