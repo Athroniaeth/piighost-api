@@ -25,8 +25,13 @@ The committed `pyproject.toml` resolves `piighost` from PyPI; the lockfile recor
 When iterating on the sibling `~/PycharmProjects/piighost` lib **without** publishing a release:
 
 1. `make install` once (or after pulling) to install the published baseline.
-2. `make dev-local` to layer an editable install of `../piighost` on top. From this point on, source changes in the lib are picked up live by this server.
-3. **Caveat**: any subsequent `uv sync` or `uv run` (which auto-syncs from the lockfile) reinstalls piighost from PyPI and undoes the editable. Re-run `make dev-local` if that happens. Set `UV_NO_SYNC=1` in your shell to silence the auto-sync if you want a stickier setup.
+2. `make dev-local` to install all optional extras (langfuse, opik, dataset) and layer an editable install of `../piighost` on top. From this point on, source changes in the lib are picked up live by this server.
+3. **Verify** the editable landed in the right venv:
+   ```bash
+   .venv/bin/python -c "import piighost, inspect; print(inspect.getfile(piighost))"
+   ```
+   Should print `~/PycharmProjects/piighost/src/piighost/__init__.py`. **Do not use `uv run` to verify** — `uv run` re-syncs from the lockfile first and silently undoes the editable.
+4. **Caveat**: any subsequent `uv sync` or `uv run` (which auto-syncs from the lockfile) reinstalls piighost from PyPI and undoes the editable. Re-run `make dev-local` if that happens. Set `UV_NO_SYNC=1` in your shell to silence the auto-sync if you want a stickier setup. The `serve` command (`uv run piighost-api serve …`) is therefore typically run as `.venv/bin/piighost-api serve …` in dev-local mode.
 
 The `prek` hook installed via `make hooks` runs `uv lock --locked --no-sources` on every commit touching `uv.lock` or `pyproject.toml`. It blocks commits whose lockfile records `piighost` as a `file://` editable source — defense-in-depth against accidentally shipping a dev-mode lockfile.
 
