@@ -1424,17 +1424,21 @@ wheels = [
 
 [[package]]
 name = "piighost"
-version = "0.11.0"
+version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/58/ef/4d306b7e3656bcda8dd99eeea05f646fc095ffb770544f667fa452e0d7d5/piighost-0.11.0.tar.gz", hash = "sha256:6735bdffc8253256e32127540abe8e637d77e55df2ddb02d1498e3f113e9c14f", size = 949039, upload-time = "2026-05-04T20:12:41.44Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/c8/c0f5babbae9dadca6b1bc920b17b040c8852b9b51d39f20922e0ad020c8a/piighost-0.12.0.tar.gz", hash = "sha256:4fd33e3fb26a76a1cc55def07b00c9727d11f5b91a74a61c8bb3932f0caf0122", size = 1070871, upload-time = "2026-05-25T15:33:26.158Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/e5/3c5a20ab82b03b9417b2d9c78fc813fde19578a68ab840ee3b8fc67d0ba6/piighost-0.11.0-py3-none-any.whl", hash = "sha256:7f8ed2ce64a80ae42bef80b6d7514aefaa5fa1defa9c6003c538b989eb732407", size = 93107, upload-time = "2026-05-04T20:12:43.368Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/27/cf2c560dbcf3a4427317f7821647b8d12ae2a2a19e6d31b29d5855c2b640/piighost-0.12.0-py3-none-any.whl", hash = "sha256:492bd06af60cff55822e3f02b34efba8ca7653b85c23e281bc8b5fa3415cff37", size = 107222, upload-time = "2026-05-25T15:33:24.483Z" },
 ]
 
 [package.optional-dependencies]
+config = [
+    { name = "pydantic" },
+    { name = "typer" },
+]
 langfuse = [
     { name = "langfuse" },
 ]
@@ -1451,7 +1455,7 @@ dependencies = [
     { name = "keyshield", extra = ["argon2"] },
     { name = "litestar" },
     { name = "msgspec" },
-    { name = "piighost" },
+    { name = "piighost", extra = ["config"] },
     { name = "requests" },
     { name = "typer" },
     { name = "uvicorn" },
@@ -1486,7 +1490,7 @@ requires-dist = [
     { name = "langfuse", marker = "extra == 'dataset'", specifier = ">=3.0" },
     { name = "litestar", specifier = ">=2.16" },
     { name = "msgspec", specifier = ">=0.19" },
-    { name = "piighost", specifier = ">=0.10" },
+    { name = "piighost", extras = ["config"], specifier = ">=0.12" },
     { name = "piighost", extras = ["langfuse"], marker = "extra == 'langfuse'" },
     { name = "piighost", extras = ["opik"], marker = "extra == 'opik'" },
     { name = "python-dotenv", marker = "extra == 'dataset'", specifier = ">=1.0" },
