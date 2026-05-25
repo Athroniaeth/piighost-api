@@ -42,8 +42,12 @@ app.add_typer(dataset_app, name="dataset")
 
 @app.command()
 def serve(
-    pipeline: str = typer.Argument(
-        ..., help="Pipeline import path in module:variable format."
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to a piighost TOML configuration file. "
+        "Falls back to the PIIGHOST_CONFIG environment variable.",
     ),
     host: str = typer.Option("127.0.0.1", help="Bind host."),
     port: int = typer.Option(8000, help="Bind port."),
@@ -51,13 +55,31 @@ def serve(
         "info", help="Log level (debug | info | warning | error)."
     ),
 ) -> None:
-    """Start the API server."""
+    """Start the API server.
+
+    The pipeline configuration is loaded from a TOML file. Pass it via
+    ``--config <path.toml>`` or set ``PIIGHOST_CONFIG`` in the environment.
+    The old ``module:variable`` Python loader has been removed.
+    """
     logging.basicConfig(
         level=getattr(logging, log_level.upper()),
         format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
         datefmt="%H:%M:%S",
     )
-    os.environ["PIIGHOST_PIPELINE"] = pipeline
+
+    config = config or _config_from_env()
+    if config is None:
+        typer.echo(
+            "Missing --config or PIIGHOST_CONFIG. "
+            "Pass a TOML file path: piighost-api serve --config pipeline.toml",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    if not config.exists():
+        typer.echo(f"Configuration file not found: {config}", err=True)
+        raise typer.Exit(code=1)
+
+    os.environ["PIIGHOST_CONFIG"] = str(config.resolve())
     uvicorn.run(
         "piighost_api.cli:_create_app",
         factory=True,
@@ -65,6 +87,13 @@ def serve(
         port=port,
         log_level=log_level,
     )
+
+
+def _config_from_env() -> Path | None:
+    raw = os.environ.get("PIIGHOST_CONFIG")
+    if not raw:
+        return None
+    return Path(raw)
 
 
 @dataset_app.command("extract")
@@ -196,11 +225,11 @@ def dataset_metrics(
 
 
 def _create_app():
-    """App factory called by uvicorn (preserved from the argparse CLI)."""
+    """App factory called by uvicorn."""
     from piighost_api.app import create_app
 
-    pipeline_path = os.environ["PIIGHOST_PIPELINE"]
-    return create_app(pipeline_path)
+    config_path = Path(os.environ["PIIGHOST_CONFIG"])
+    return create_app(config_path)
 
 
 def main() -> None:
