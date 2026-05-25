@@ -83,9 +83,20 @@ class DeanonymizeEntResponse(msgspec.Struct):
     text: str
 
 
-class ConfigResponse(msgspec.Struct):
-    labels: list[str] | None
-    placeholder_factory: str
+class DetectorLabelsSchema(msgspec.Struct):
+    name: str | None
+    type: str
+    labels: list[str]
+
+
+class PipelineMetaSchema(msgspec.Struct):
+    name: str | None
+    schema_version: int
+
+
+class LabelsResponse(msgspec.Struct):
+    pipeline: PipelineMetaSchema
+    detectors: list[DetectorLabelsSchema]
 
 
 class IndexResponse(msgspec.Struct):
@@ -160,14 +171,6 @@ def _serialize_entities_plain(entities: list[Entity]) -> list[EntitySchema]:
     return result
 
 
-def _get_detector_labels(pipeline: ThreadAnonymizationPipeline) -> list[str] | None:
-    """Try to extract labels from the detector."""
-    detector = pipeline._detector
-    if hasattr(detector, "labels"):
-        return list(detector.labels)
-    return None
-
-
 # ------------------------------------------------------------------
 # Application factory
 # ------------------------------------------------------------------
@@ -230,13 +233,17 @@ def create_app(config_path: Path) -> Litestar:
             detector=type(pipeline._detector).__name__,
         )
 
-    @get("/v1/config")
-    async def get_config() -> ConfigResponse:
-        labels = _get_detector_labels(pipeline)
-        factory_name = type(pipeline.ph_factory).__name__
-        return ConfigResponse(
-            labels=labels,
-            placeholder_factory=factory_name,
+    @get("/v1/labels", exclude_from_auth=True)
+    async def labels() -> LabelsResponse:
+        return LabelsResponse(
+            pipeline=PipelineMetaSchema(
+                name=manifest.name,
+                schema_version=manifest.schema_version,
+            ),
+            detectors=[
+                DetectorLabelsSchema(name=d.name, type=d.type, labels=d.labels)
+                for d in manifest.detectors
+            ],
         )
 
     @post("/v1/detect")
@@ -318,7 +325,7 @@ def create_app(config_path: Path) -> Litestar:
         route_handlers=[
             index,
             health,
-            get_config,
+            labels,
             detect,
             override_detect,
             anonymize,
