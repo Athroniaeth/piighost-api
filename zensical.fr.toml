@@ -19,6 +19,7 @@ nav = [
   { "Référence" = [
     { "Endpoints REST" = "reference/endpoints.md" },
     { "CLI" = "reference/cli.md" },
+    { "Migration" = "migration.md" },
   ]},
 ]
 

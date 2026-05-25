@@ -38,16 +38,21 @@ curl http://localhost:8000/health
 
 ---
 
-## `GET /v1/config`
+## `GET /v1/labels`
 
-Renvoie les labels que le pipeline déclare (quand le détecteur expose `.labels`) et le nom de la classe de la fabrique de placeholders. Utile pour les clients qui souhaitent afficher le vocabulaire de labels dans une interface.
+Renvoie les métadonnées du pipeline et les labels groupés par détecteur. Utilisez cet endpoint dans les clients qui ont besoin de connaître les types d'entités que le pipeline peut produire (par exemple pour alimenter un sélecteur de labels dans une interface). Aucune authentification requise.
 
 ```bash
-curl http://localhost:8000/v1/config
+curl http://localhost:8000/v1/labels
 ```
 
 ```json
-{"labels": ["PERSON", "LOCATION", "EMAIL"], "placeholder_factory": "LabelCounterPlaceholderFactory"}
+{
+  "pipeline": {"name": null, "schema_version": 1},
+  "detectors": [
+    {"name": null, "type": "regex", "labels": ["EMAIL", "PHONE"]}
+  ]
+}
 ```
 
 ---
@@ -164,5 +169,7 @@ curl -X POST http://localhost:8000/v1/deanonymize/entities \
 ## Authentification
 
 Quand les variables d'environnement `API_KEY_<NAME>=<key>` sont définies au démarrage, chaque endpoint protégé exige la clé correspondante dans un en-tête `Authorization`. Voir [keyshield](https://github.com/Athroniaeth/keyshield) pour le détail des scopes, de la rotation et du hash Argon2.
+
+`GET /`, `GET /health` et `GET /v1/labels` sont toujours exclus de l'authentification, quelle que soit la configuration.
 
 Quand aucune clé d'API n'est configurée, l'authentification est désactivée (le serveur logge `auth disabled` au démarrage).

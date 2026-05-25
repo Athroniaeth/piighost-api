@@ -7,7 +7,7 @@ icon: lucide/terminal
 `piighost-api` ships a Typer CLI with three subcommands.
 
 ```text
-piighost-api serve         <pipeline> [options]
+piighost-api serve         [--config PATH] [options]
 piighost-api dataset extract --output FILE [options]
 piighost-api dataset metrics --input FILE  [options]
 ```
@@ -22,15 +22,17 @@ Start the HTTP server. Loads the pipeline once and keeps it warm; uvicorn handle
 
 | Argument / option | Type | Default | Description |
 |---|---|---|---|
-| `pipeline` | string | required | Pipeline import path in `module:variable` format (e.g. `pipeline:pipeline`). |
+| `--config` / `-c` | path | — | Path to a piighost TOML configuration file. Falls back to the `PIIGHOST_CONFIG` env var when not supplied. |
 | `--host` | string | `127.0.0.1` | Bind host. Set to `0.0.0.0` to expose on all interfaces. |
 | `--port` | int | `8000` | Bind port. |
 | `--log-level` | string | `info` | Log level. One of `debug`, `info`, `warning`, `error`. |
 
-The pipeline path is forwarded to a uvicorn factory via the `PIIGHOST_PIPELINE` env var, so the server can hot-reload without rebuilding the import path.
+The resolved config path is forwarded to a uvicorn factory via `PIIGHOST_CONFIG`, so the server can hot-reload without repeating the flag.
+
+> **Breaking change.** The previous `<pipeline>` positional argument (`module:variable` Python import path) has been removed. Use a TOML file instead. See the [migration guide](../migration.md).
 
 ```bash
-piighost-api serve pipeline:pipeline --host 0.0.0.0 --port 8000
+piighost-api serve --config pipeline.toml --host 0.0.0.0 --port 8000
 ```
 
 ---

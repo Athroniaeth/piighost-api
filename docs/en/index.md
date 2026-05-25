@@ -40,12 +40,12 @@ sequenceDiagram
 - **Thread-scoped memory** — conversation entities tracked per `thread_id` for cross-message linking.
 - **API key authentication** — [keyshield](https://github.com/Athroniaeth/keyshield) with Argon2 hashing, scopes, and expiration.
 - **Redis cache** — anonymization mappings and detection results persisted via aiocache.
-- **Configurable pipeline** — specify a Python file at startup (`module:variable` pattern).
+- **Configurable pipeline** — declare detectors in a `pipeline.toml` file and pass it at startup with `--config`.
 - **HITL dataset CLI** — `piighost-api dataset extract|metrics` builds a NER training set from the observation backend.
 
 ## Next steps
 
 - [Installation](getting-started/installation.md) — install via uv, pip, or Docker.
-- [Quickstart](getting-started/quickstart.md) — write a `pipeline.py` and make your first request.
+- [Quickstart](getting-started/quickstart.md) — write a `pipeline.toml` and make your first request.
 - [REST endpoints](reference/endpoints.md) — full API reference.
 - [CLI](reference/cli.md) — `serve`, `dataset extract`, `dataset metrics`.

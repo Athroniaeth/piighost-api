@@ -6,37 +6,23 @@ icon: lucide/zap
 
 Spin up a piighost-api server, run your first anonymization request, see the placeholder in action. Five minutes from a fresh repo clone.
 
-## 1. Write a `pipeline.py`
+## 1. Write a `pipeline.toml`
 
-The server loads a single pipeline at boot, specified via `module:variable`. Create `pipeline.py` next to the place you'll run the server from. Regex-only is enough to play:
+The server loads a single pipeline at boot from a TOML configuration file. Create `pipeline.toml` next to the place you'll run the server from. Regex-only is enough to play:
 
-```python
-from piighost.anonymizer import Anonymizer
-from piighost.detector import RegexDetector
-from piighost.linker.entity import ExactEntityLinker
-from piighost.pipeline.thread import ThreadAnonymizationPipeline
-from piighost.placeholder import LabelCounterPlaceholderFactory
-from piighost.resolver.entity import MergeEntityConflictResolver
-from piighost.resolver.span import ConfidenceSpanConflictResolver
+```toml
+[[detectors]]
+type = "regex"
 
-pipeline = ThreadAnonymizationPipeline(
-    detector=RegexDetector(
-        patterns={
-            "EMAIL": r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
-            "PHONE": r"\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?(?:[\s.\-]?\d{1,4}){1,4}",
-        }
-    ),
-    span_resolver=ConfidenceSpanConflictResolver(),
-    entity_linker=ExactEntityLinker(),
-    entity_resolver=MergeEntityConflictResolver(),
-    anonymizer=Anonymizer(LabelCounterPlaceholderFactory()),
-)
+[detectors.patterns]
+EMAIL = "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+PHONE = "\\+\\d{1,3}[\\s.\\-]?\\(?\\d{1,4}\\)?(?:[\\s.\\-]?\\d{1,4}){1,4}"
 ```
 
 ## 2. Start the server
 
 ```bash
-piighost-api serve pipeline:pipeline --host 0.0.0.0 --port 8000
+piighost-api serve --config pipeline.toml --host 0.0.0.0 --port 8000
 ```
 
 Expected log: `Pipeline ready: RegexDetector` and uvicorn listening on `0.0.0.0:8000`.
@@ -82,7 +68,7 @@ Set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` (or `OPIK_API_KEY`) in your en
 
 ## Container path
 
-If you prefer Docker, the [Installation](installation.md) page documents the GHCR image. The same `pipeline.py` mounts in via a volume.
+If you prefer Docker, the [Installation](installation.md) page documents the GHCR image. Mount your `pipeline.toml` into the container via a volume and set `PIIGHOST_CONFIG` to its path, or pass `--config` to the entrypoint.
 
 ## Next
 
