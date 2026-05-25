@@ -2,11 +2,14 @@
 
 import os
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from piighost_api.cli import _create_app, app
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 runner = CliRunner()
@@ -34,13 +37,17 @@ def test_no_command_prints_help_and_exits_zero() -> None:
     assert "Usage" in result.stdout
 
 
-def test_serve_sets_env_and_runs_uvicorn() -> None:
+def test_serve_sets_env_and_runs_uvicorn(tmp_path) -> None:
+    config_file = tmp_path / "pipeline.toml"
+    config_file.write_text("[[detectors]]\ntype = 'regex'\npatterns = {}\n")
+
     with patch("piighost_api.cli.uvicorn") as mock_uvicorn:
         result = runner.invoke(
             app,
             [
                 "serve",
-                "mymod:pipe",
+                "--config",
+                str(config_file),
                 "--host",
                 "0.0.0.0",
                 "--port",
@@ -51,7 +58,7 @@ def test_serve_sets_env_and_runs_uvicorn() -> None:
         )
 
     assert result.exit_code == 0
-    assert os.environ["PIIGHOST_PIPELINE"] == "mymod:pipe"
+    assert os.environ["PIIGHOST_CONFIG"] == str(config_file.resolve())
     mock_uvicorn.run.assert_called_once_with(
         "piighost_api.cli:_create_app",
         factory=True,
@@ -93,10 +100,13 @@ def test_dataset_extract_missing_credentials_exits_one(tmp_path, monkeypatch) ->
     )
 
 
-def test_create_app_factory() -> None:
-    with patch.dict(os.environ, {"PIIGHOST_PIPELINE": "test:pipeline"}):
+def test_create_app_factory(tmp_path) -> None:
+    config_file = tmp_path / "pipeline.toml"
+    config_file.write_text("[[detectors]]\ntype = 'regex'\npatterns = {}\n")
+
+    with patch.dict(os.environ, {"PIIGHOST_CONFIG": str(config_file)}):
         with patch("piighost_api.app.create_app") as mock_create:
             mock_create.return_value = MagicMock()
             result = _create_app()
-            mock_create.assert_called_once_with("test:pipeline")
+            mock_create.assert_called_once_with(Path(str(config_file)))
             assert result is mock_create.return_value

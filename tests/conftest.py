@@ -1,6 +1,7 @@
 """Shared fixtures for piighost-api tests."""
 
 from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,6 +10,8 @@ from litestar.testing import TestClient
 
 from piighost.models import Detection, Entity, Span
 from piighost.placeholder import LabelCounterPlaceholderFactory
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _make_entity(
@@ -71,12 +74,28 @@ def mock_pipeline() -> MagicMock:
 
 
 @pytest.fixture
-def app(mock_pipeline: MagicMock) -> Litestar:
+def mock_manifest() -> MagicMock:
+    """Mock pipeline manifest returned alongside the pipeline by load_pipeline."""
+    manifest = MagicMock()
+    manifest.name = "test"
+    manifest.schema_version = 1
+    detector = MagicMock()
+    detector.name = "default"
+    detector.type = "exact"
+    detector.labels = ["PERSON", "LOCATION"]
+    manifest.detectors = [detector]
+    return manifest
+
+
+@pytest.fixture
+def app(mock_pipeline: MagicMock, mock_manifest: MagicMock) -> Litestar:
     """Create a Litestar app with mock pipeline (bypasses load_pipeline)."""
-    with patch("piighost_api.app.load_pipeline", return_value=mock_pipeline):
+    with patch(
+        "piighost_api.app.load_pipeline", return_value=(mock_pipeline, mock_manifest)
+    ):
         from piighost_api.app import create_app
 
-        return create_app("fake:pipeline")
+        return create_app(FIXTURES / "minimal.toml")
 
 
 @pytest.fixture

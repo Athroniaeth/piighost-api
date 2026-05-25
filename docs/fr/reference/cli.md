@@ -7,7 +7,7 @@ icon: lucide/terminal
 `piighost-api` embarque un CLI Typer avec trois sous-commandes.
 
 ```text
-piighost-api serve         <pipeline> [options]
+piighost-api serve         [--config PATH] [options]
 piighost-api dataset extract --output FILE [options]
 piighost-api dataset metrics --input FILE  [options]
 ```
@@ -22,15 +22,17 @@ Démarre le serveur HTTP. Charge le pipeline une seule fois et le garde chaud ; 
 
 | Argument / option | Type | Défaut | Description |
 |---|---|---|---|
-| `pipeline` | string | requis | Chemin d'import du pipeline au format `module:variable` (ex. `pipeline:pipeline`). |
+| `--config` / `-c` | path | — | Chemin vers un fichier de configuration TOML piighost. Se replie sur la variable d'environnement `PIIGHOST_CONFIG` si absent. |
 | `--host` | string | `127.0.0.1` | Hôte d'écoute. Mettre `0.0.0.0` pour exposer sur toutes les interfaces. |
 | `--port` | int | `8000` | Port d'écoute. |
 | `--log-level` | string | `info` | Niveau de log. L'un de `debug`, `info`, `warning`, `error`. |
 
-Le chemin du pipeline est transmis à une factory uvicorn via la variable d'environnement `PIIGHOST_PIPELINE`, donc le serveur peut hot-reload sans reconstruire le chemin d'import.
+Le chemin de configuration résolu est transmis à une factory uvicorn via `PIIGHOST_CONFIG`, donc le serveur peut hot-reload sans répéter le flag.
+
+> **Changement cassant.** L'argument positionnel `<pipeline>` (chemin d'import Python au format `module:variable`) a été supprimé. Utilisez un fichier TOML à la place. Voir le [guide de migration](../migration.md).
 
 ```bash
-piighost-api serve pipeline:pipeline --host 0.0.0.0 --port 8000
+piighost-api serve --config pipeline.toml --host 0.0.0.0 --port 8000
 ```
 
 ---

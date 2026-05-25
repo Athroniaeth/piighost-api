@@ -4,6 +4,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import msgspec
 from keyshield import ApiKeyService
@@ -13,12 +14,12 @@ from litestar import Litestar, get, post, put
 from litestar.exceptions import NotFoundException
 from litestar.openapi import OpenAPIConfig
 
+from piighost.config import load_pipeline
 from piighost.exceptions import CacheMissError
 from piighost.models import Detection, Entity, Span
 from piighost.pipeline.thread import ThreadAnonymizationPipeline, _current_thread_id
 
 from piighost_api.auth import create_auth_guard
-from piighost_api.loader import load_pipeline
 from piighost_api.observation import load_observation_service
 
 logger = logging.getLogger(__name__)
@@ -82,9 +83,20 @@ class DeanonymizeEntResponse(msgspec.Struct):
     text: str
 
 
-class ConfigResponse(msgspec.Struct):
-    labels: list[str] | None
-    placeholder_factory: str
+class DetectorLabelsSchema(msgspec.Struct):
+    name: str | None
+    type: str
+    labels: list[str]
+
+
+class PipelineMetaSchema(msgspec.Struct):
+    name: str | None
+    schema_version: int
+
+
+class LabelsResponse(msgspec.Struct):
+    pipeline: PipelineMetaSchema
+    detectors: list[DetectorLabelsSchema]
 
 
 class IndexResponse(msgspec.Struct):
@@ -159,29 +171,21 @@ def _serialize_entities_plain(entities: list[Entity]) -> list[EntitySchema]:
     return result
 
 
-def _get_detector_labels(pipeline: ThreadAnonymizationPipeline) -> list[str] | None:
-    """Try to extract labels from the detector."""
-    detector = pipeline._detector
-    if hasattr(detector, "labels"):
-        return list(detector.labels)
-    return None
-
-
 # ------------------------------------------------------------------
 # Application factory
 # ------------------------------------------------------------------
 
 
-def create_app(pipeline_path: str) -> Litestar:
+def create_app(config_path: Path) -> Litestar:
     """Create and configure the Litestar application.
 
     Args:
-        pipeline_path: Import path in ``module:variable`` format.
+        config_path: Path to a piighost TOML configuration file.
 
     Returns:
         A fully configured ``Litestar`` instance.
     """
-    pipeline = load_pipeline(pipeline_path)
+    pipeline, manifest = load_pipeline(config_path)
 
     observation = load_observation_service()
     if observation is not None:
@@ -203,7 +207,11 @@ def create_app(pipeline_path: str) -> Litestar:
             logger.info("API keys loaded — auth enabled")
         except Exception as exc:
             logger.warning("No valid API keys found (%s) — auth disabled", exc)
-        logger.info("Pipeline ready: %s", type(pipeline._detector).__name__)
+        logger.info(
+            "Pipeline ready: %s (%d detector(s))",
+            manifest.name or "<unnamed>",
+            len(manifest.detectors),
+        )
         yield
 
     # ------------------------------------------------------------------
@@ -225,13 +233,17 @@ def create_app(pipeline_path: str) -> Litestar:
             detector=type(pipeline._detector).__name__,
         )
 
-    @get("/v1/config")
-    async def get_config() -> ConfigResponse:
-        labels = _get_detector_labels(pipeline)
-        factory_name = type(pipeline.ph_factory).__name__
-        return ConfigResponse(
-            labels=labels,
-            placeholder_factory=factory_name,
+    @get("/v1/labels", exclude_from_auth=True)
+    async def labels() -> LabelsResponse:
+        return LabelsResponse(
+            pipeline=PipelineMetaSchema(
+                name=manifest.name,
+                schema_version=manifest.schema_version,
+            ),
+            detectors=[
+                DetectorLabelsSchema(name=d.name, type=d.type, labels=d.labels)
+                for d in manifest.detectors
+            ],
         )
 
     @post("/v1/detect")
@@ -313,7 +325,7 @@ def create_app(pipeline_path: str) -> Litestar:
         route_handlers=[
             index,
             health,
-            get_config,
+            labels,
             detect,
             override_detect,
             anonymize,

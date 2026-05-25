@@ -56,7 +56,7 @@ A pre-built image is published to GitHub Container Registry:
 docker pull ghcr.io/athroniaeth/piighost-api:latest
 ```
 
-Mount your `pipeline.py` and override `EXTRA_PACKAGES` to install detector extras at boot:
+Mount your `pipeline.toml` and override `EXTRA_PACKAGES` to install detector extras at boot:
 
 ```yaml
 services:
@@ -64,10 +64,11 @@ services:
     image: ghcr.io/athroniaeth/piighost-api:latest
     environment:
       - EXTRA_PACKAGES=piighost[gliner2,langfuse]
+      - PIIGHOST_CONFIG=/app/pipeline.toml
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
     volumes:
-      - ./pipeline.py:/app/pipeline.py
+      - ./pipeline.toml:/app/pipeline.toml
 ```
 
 The entrypoint runs `uv pip install $EXTRA_PACKAGES` at startup, so the same image serves regex-only and NER deployments.

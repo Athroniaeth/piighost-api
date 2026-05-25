@@ -6,37 +6,23 @@ icon: lucide/zap
 
 Démarrer un serveur piighost-api, effectuer votre première requête d'anonymisation, voir les placeholders en action. Cinq minutes depuis un clone de repo.
 
-## 1. Écrire un `pipeline.py`
+## 1. Écrire un `pipeline.toml`
 
-Le serveur charge un unique pipeline au démarrage, spécifié via `module:variable`. Créez `pipeline.py` à l'endroit d'où vous lancerez le serveur. Une configuration regex seule suffit pour jouer :
+Le serveur charge un unique pipeline au démarrage depuis un fichier de configuration TOML. Créez `pipeline.toml` à l'endroit d'où vous lancerez le serveur. Une configuration regex seule suffit pour jouer :
 
-```python
-from piighost.anonymizer import Anonymizer
-from piighost.detector import RegexDetector
-from piighost.linker.entity import ExactEntityLinker
-from piighost.pipeline.thread import ThreadAnonymizationPipeline
-from piighost.placeholder import LabelCounterPlaceholderFactory
-from piighost.resolver.entity import MergeEntityConflictResolver
-from piighost.resolver.span import ConfidenceSpanConflictResolver
+```toml
+[[detectors]]
+type = "regex"
 
-pipeline = ThreadAnonymizationPipeline(
-    detector=RegexDetector(
-        patterns={
-            "EMAIL": r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
-            "PHONE": r"\+\d{1,3}[\s.\-]?\(?\d{1,4}\)?(?:[\s.\-]?\d{1,4}){1,4}",
-        }
-    ),
-    span_resolver=ConfidenceSpanConflictResolver(),
-    entity_linker=ExactEntityLinker(),
-    entity_resolver=MergeEntityConflictResolver(),
-    anonymizer=Anonymizer(LabelCounterPlaceholderFactory()),
-)
+[detectors.patterns]
+EMAIL = "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}"
+PHONE = "\\+\\d{1,3}[\\s.\\-]?\\(?\\d{1,4}\\)?(?:[\\s.\\-]?\\d{1,4}){1,4}"
 ```
 
 ## 2. Démarrer le serveur
 
 ```bash
-piighost-api serve pipeline:pipeline --host 0.0.0.0 --port 8000
+piighost-api serve --config pipeline.toml --host 0.0.0.0 --port 8000
 ```
 
 Log attendu : `Pipeline ready: RegexDetector` et uvicorn en écoute sur `0.0.0.0:8000`.
@@ -82,7 +68,7 @@ Définissez `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` (ou `OPIK_API_KEY`) da
 
 ## Chemin Docker
 
-Si vous préférez Docker, la page [Installation](installation.md) documente l'image GHCR. Le même `pipeline.py` se monte via un volume.
+Si vous préférez Docker, la page [Installation](installation.md) documente l'image GHCR. Montez votre `pipeline.toml` dans le conteneur via un volume et définissez `PIIGHOST_CONFIG` sur son chemin, ou passez `--config` au point d'entrée.
 
 ## Suite
 
