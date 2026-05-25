@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pytest
 from litestar.testing import TestClient
 
 from piighost_api.app import create_app

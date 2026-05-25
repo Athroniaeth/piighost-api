@@ -1,8 +1,5 @@
 """Smoke tests for the `serve` subcommand argument parsing."""
 
-from pathlib import Path
-
-import pytest
 from typer.testing import CliRunner
 
 from piighost_api.cli import app

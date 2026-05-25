@@ -1,6 +1,5 @@
 """Tests for app.py — routes, helpers, lifespan."""
 
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from litestar.testing import TestClient
