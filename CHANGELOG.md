@@ -1,3 +1,39 @@
+## 0.8.0 (2026-05-25)
+
+### BREAKING CHANGE
+
+- piighost-api serve no longer accepts a module:variable
+positional argument. Pass --config <path.toml> or set PIIGHOST_CONFIG
+in the environment. The /v1/config route is replaced by /v1/labels
+with per-detector grouping. The piighost_api.loader module is removed
+(responsibility moved to piighost.config.load_pipeline). pipeline.py
+is replaced by pipeline.toml. PIPELINE_PATH env var renamed to
+PIIGHOST_CONFIG.
+- the /v1/config route is removed. /v1/labels returns
+labels grouped by detector along with pipeline metadata.
+- `piighost-api serve` no longer accepts a positional
+`module:variable` argument. Pass a TOML config file via
+`--config <path.toml>` or the `PIIGHOST_CONFIG` environment variable.
+`_create_app` now reads `PIIGHOST_CONFIG` (Path) instead of
+`PIIGHOST_PIPELINE` (module:variable string).
+- ``make install-pypi`` is removed; use ``make install``
+for the PyPI flow (which is now the default) or ``make dev-local`` for
+the editable flow.
+
+### Feat
+
+- **api**: switch to piighost.config TOML loader
+- **api**: replace /v1/config with /v1/labels
+- **app**: load pipeline via piighost.config TOML loader
+- **cli**: replace module:variable pipeline loader with --config TOML
+
+### Fix
+
+- **make**: make dev-local target the project venv and pull all extras
+- **tests**: strip ANSI codes before asserting CLI help output
+- **ci**: pass --no-sources to uv sync so CI ignores the local-dev path
+- **detect**: propagate thread_id via _current_thread_id ContextVar
+
 ## 0.7.0 (2026-05-04)
 
 ### Feat
