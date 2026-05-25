@@ -1,5 +1,6 @@
 """Tests for app.py — routes, helpers, lifespan."""
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from litestar.testing import TestClient
@@ -8,9 +9,9 @@ from piighost.exceptions import CacheMissError
 from piighost.models import Detection, Entity, Span
 from piighost.placeholder import LabelCounterPlaceholderFactory
 
-from piighost_api.app import _get_detector_labels, _serialize_entities
+from piighost_api.app import _serialize_entities
 
-from conftest import ENTITY_LOCATION, ENTITY_PERSON
+from conftest import ENTITY_LOCATION, ENTITY_PERSON, FIXTURES
 
 
 # ------------------------------------------------------------------
@@ -43,26 +44,6 @@ def test_health(client: TestClient) -> None:
     data = response.json()
     assert data["status"] == "ok"
     assert "detector" in data
-
-
-# ------------------------------------------------------------------
-# GET /v1/config
-# ------------------------------------------------------------------
-
-
-def test_get_config(client: TestClient) -> None:
-    response = client.get("/v1/config")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["labels"] == ["PERSON", "LOCATION"]
-    assert data["placeholder_factory"] == "LabelCounterPlaceholderFactory"
-
-
-def test_get_config_no_labels(mock_pipeline: MagicMock, client: TestClient) -> None:
-    del mock_pipeline._detector.labels
-    response = client.get("/v1/config")
-    assert response.status_code == 200
-    assert response.json()["labels"] is None
 
 
 # ------------------------------------------------------------------
@@ -155,29 +136,32 @@ def test_serialize_entities_no_match(mock_pipeline: MagicMock) -> None:
     assert result[0].placeholder == ""
 
 
-def test_get_detector_labels_present(mock_pipeline: MagicMock) -> None:
-    assert _get_detector_labels(mock_pipeline) == ["PERSON", "LOCATION"]
-
-
-def test_get_detector_labels_absent(mock_pipeline: MagicMock) -> None:
-    del mock_pipeline._detector.labels
-    assert _get_detector_labels(mock_pipeline) is None
-
-
 # ------------------------------------------------------------------
 # Lifespan — auth failure branch
 # ------------------------------------------------------------------
 
 
-def test_lifespan_auth_success() -> None:
-    mock_pipeline = MagicMock()
-    mock_pipeline._detector = MagicMock()
-    mock_pipeline._detector.labels = ["PERSON"]
-    mock_pipeline.ph_factory = LabelCounterPlaceholderFactory()
-    mock_pipeline.anonymize = AsyncMock(return_value=("anon", []))
-    mock_pipeline.get_resolved_entities = MagicMock(return_value=[])
+def _make_mock_load_pipeline_result() -> tuple[MagicMock, MagicMock]:
+    """Return (mock_pipeline, mock_manifest) matching create_app's expectations."""
+    pipeline = MagicMock()
+    pipeline._detector = MagicMock()
+    pipeline._detector.labels = ["PERSON"]
+    pipeline.ph_factory = LabelCounterPlaceholderFactory()
+    pipeline.anonymize = AsyncMock(return_value=("anon", []))
+    pipeline.get_resolved_entities = MagicMock(return_value=[])
 
-    with patch("piighost_api.app.load_pipeline", return_value=mock_pipeline):
+    manifest = MagicMock()
+    manifest.name = "test"
+    manifest.schema_version = 1
+    manifest.detectors = []
+
+    return pipeline, manifest
+
+
+def test_lifespan_auth_success() -> None:
+    mock_result = _make_mock_load_pipeline_result()
+
+    with patch("piighost_api.app.load_pipeline", return_value=mock_result):
         with patch("piighost_api.app.ApiKeyService") as mock_svc_cls:
             mock_svc = MagicMock()
             mock_svc.load_dotenv = AsyncMock()
@@ -185,30 +169,25 @@ def test_lifespan_auth_success() -> None:
 
             from piighost_api.app import create_app
 
-            app = create_app("fake:pipeline")
+            app = create_app(FIXTURES / "minimal.toml")
 
             with TestClient(app=app) as tc:
-                response = tc.get("/v1/config")
+                response = tc.get("/v1/labels")
                 assert response.status_code == 200
                 mock_svc.load_dotenv.assert_called_once()
 
 
 def test_lifespan_auth_failure() -> None:
-    mock_pipeline = MagicMock()
-    mock_pipeline._detector = MagicMock()
-    mock_pipeline._detector.labels = ["PERSON"]
-    mock_pipeline.ph_factory = LabelCounterPlaceholderFactory()
-    mock_pipeline.anonymize = AsyncMock(return_value=("anon", []))
-    mock_pipeline.get_resolved_entities = MagicMock(return_value=[])
+    mock_result = _make_mock_load_pipeline_result()
 
-    with patch("piighost_api.app.load_pipeline", return_value=mock_pipeline):
+    with patch("piighost_api.app.load_pipeline", return_value=mock_result):
         with patch.dict(
             "os.environ", {"API_KEY_bad": "invalid-key-format"}, clear=False
         ):
             from piighost_api.app import create_app
 
-            app = create_app("fake:pipeline")
+            app = create_app(FIXTURES / "minimal.toml")
 
             with TestClient(app=app) as tc:
-                response = tc.get("/v1/config")
+                response = tc.get("/v1/labels")
                 assert response.status_code == 200
