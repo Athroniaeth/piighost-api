@@ -205,3 +205,14 @@ def test_lifespan_auth_failure() -> None:
             with TestClient(app=app) as tc:
                 response = tc.get("/v1/labels")
                 assert response.status_code == 200
+
+
+# ------------------------------------------------------------------
+# DELETE /v1/threads/{thread_id}
+# ------------------------------------------------------------------
+
+
+def test_forget_thread_returns_204(client, mock_pipeline):
+    res = client.delete("/v1/threads/t1")
+    assert res.status_code == 204
+    mock_pipeline.forget_thread.assert_awaited_once_with("t1")

@@ -11,7 +11,7 @@ import msgspec
 from keyshield import ApiKeyService
 from keyshield.hasher.argon2 import Argon2ApiKeyHasher
 from keyshield.repositories.in_memory import InMemoryApiKeyRepository
-from litestar import Litestar, get, post, put
+from litestar import Litestar, delete, get, post, put
 from litestar.exceptions import NotFoundException
 from litestar.openapi import OpenAPIConfig
 
@@ -307,6 +307,15 @@ def create_app(config_path: Path) -> Litestar:
         )
         return DeanonymizeEntResponse(text=result)
 
+    @delete("/v1/threads/{thread_id:str}")
+    async def forget_thread(thread_id: str) -> None:
+        """Erase every trace of a conversation: memory and cached mappings.
+
+        Backed by ``ThreadAnonymizationPipeline.forget_thread`` (right to
+        be forgotten). Idempotent.
+        """
+        await pipeline.forget_thread(thread_id)
+
     return Litestar(
         route_handlers=[
             index,
@@ -317,6 +326,7 @@ def create_app(config_path: Path) -> Litestar:
             anonymize,
             deanonymize,
             deanonymize_entities,
+            forget_thread,
         ],
         guards=guards,
         lifespan=[lifespan],

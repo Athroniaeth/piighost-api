@@ -61,6 +61,7 @@ def mock_pipeline() -> MagicMock:
     pipeline.deanonymize_with_ent = AsyncMock(return_value="Patrick aime Paris")
 
     pipeline.detect_entities = AsyncMock(return_value=[ENTITY_PERSON, ENTITY_LOCATION])
+    pipeline.forget_thread = AsyncMock()
 
     pipeline.get_resolved_entities = MagicMock(
         return_value=[ENTITY_PERSON, ENTITY_LOCATION]
