@@ -28,8 +28,14 @@ def test_index(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "piighost-api"
-    assert data["version"] == "0.1.0"
     assert data["docs"] == "/schema/swagger"
+
+
+def test_index_reports_package_version(client: TestClient) -> None:
+    body = client.get("/").json()
+    from importlib.metadata import version
+
+    assert body["version"] == version("piighost-api")
 
 
 # ------------------------------------------------------------------
@@ -43,6 +49,15 @@ def test_health(client: TestClient) -> None:
     data = response.json()
     assert data["status"] == "ok"
     assert "detector" in data
+
+
+def test_health_reports_manifest_detectors(client: TestClient) -> None:
+    body = client.get("/health").json()
+    # Manifest-based, not pipeline._detector: the conftest mock manifest
+    # declares its detector types.
+    assert body["detector"]
+    assert "Mock" not in body["detector"]
+    assert body["detector"] == "exact"
 
 
 # ------------------------------------------------------------------

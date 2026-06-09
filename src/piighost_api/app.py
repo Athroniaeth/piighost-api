@@ -4,6 +4,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 import msgspec
@@ -17,12 +18,14 @@ from litestar.openapi import OpenAPIConfig
 from piighost.config import load_pipeline
 from piighost.exceptions import CacheMissError
 from piighost.models import Detection, Entity, Span
-from piighost.pipeline.thread import ThreadAnonymizationPipeline, _current_thread_id
+from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import create_auth_guard
 from piighost_api.observation import load_observation_service
 
 logger = logging.getLogger(__name__)
+
+API_VERSION = _pkg_version("piighost-api")
 
 
 # ------------------------------------------------------------------
@@ -121,18 +124,12 @@ def _serialize_entities(
     thread_id: str,
 ) -> list[EntitySchema]:
     """Serialize piighost entities with their placeholder tokens."""
-    resolved = pipeline.get_resolved_entities(thread_id)
-    tokens = pipeline.ph_factory.create(resolved)
-
-    token_lookup: dict[tuple[str, str], str] = {}
-    for ent, tok in tokens.items():
-        token_lookup[(ent.detections[0].text.lower(), ent.label)] = tok
+    tokens = pipeline.get_resolved_tokens(thread_id)
+    token_lookup = {ent.canonical_key: tok for ent, tok in tokens.items()}
 
     result: list[EntitySchema] = []
     for entity in entities:
-        key = (entity.detections[0].text.lower(), entity.label)
-        placeholder = token_lookup.get(key, "")
-
+        placeholder = token_lookup.get(entity.canonical_key, "")
         detections = [
             DetectionSchema(
                 text=d.text,
@@ -189,7 +186,7 @@ def create_app(config_path: Path) -> Litestar:
 
     observation = load_observation_service()
     if observation is not None:
-        pipeline._observation = observation
+        pipeline.observation = observation
         logger.info("Observation enabled: %s", type(observation).__name__)
 
     pepper = os.getenv("SECRET_PEPPER")
@@ -222,7 +219,7 @@ def create_app(config_path: Path) -> Litestar:
     async def index() -> IndexResponse:
         return IndexResponse(
             name="piighost-api",
-            version="0.1.0",
+            version=API_VERSION,
             docs="/schema/swagger",
         )
 
@@ -230,7 +227,7 @@ def create_app(config_path: Path) -> Litestar:
     async def health() -> HealthResponse:
         return HealthResponse(
             status="ok",
-            detector=type(pipeline._detector).__name__,
+            detector=", ".join(d.type for d in manifest.detectors) or "none",
         )
 
     @get("/v1/labels", exclude_from_auth=True)
@@ -248,19 +245,8 @@ def create_app(config_path: Path) -> Litestar:
 
     @post("/v1/detect")
     async def detect(data: DetectRequest) -> DetectResponse:
-        # detect_entities does not yet accept a thread_id kwarg, so we
-        # set the lib's ContextVar manually for the duration of the call.
-        # The ContextVar is what _cached_detect reads to compute the
-        # cache key; without this, every request would share the
-        # "default" thread bucket.
-        token = _current_thread_id.set(data.thread_id)
-        try:
-            entities = await pipeline.detect_entities(data.text)
-        finally:
-            _current_thread_id.reset(token)
-        return DetectResponse(
-            entities=_serialize_entities_plain(entities),
-        )
+        entities = await pipeline.detect_entities(data.text, thread_id=data.thread_id)
+        return DetectResponse(entities=_serialize_entities_plain(entities))
 
     @put("/v1/detect")
     async def override_detect(data: OverrideDetectRequest) -> None:
@@ -336,7 +322,7 @@ def create_app(config_path: Path) -> Litestar:
         lifespan=[lifespan],
         openapi_config=OpenAPIConfig(
             title="piighost-api",
-            version="0.1.0",
+            version=API_VERSION,
             description="REST API for piighost PII anonymization inference.",
         ),
     )
