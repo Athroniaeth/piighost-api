@@ -1,5 +1,7 @@
 """Shared fixtures for piighost-api tests."""
 
+import os
+
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -105,6 +107,12 @@ def allow_anonymous(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
     monkeypatch.delenv("PIIGHOST_RATE_LIMIT", raising=False)
+    # Scrub any ambient API_KEY_* so a developer's exported keys cannot
+    # flip these open-route tests into enforcing auth (keyshield would
+    # load them and enable the guard despite anonymous mode).
+    for key in list(os.environ):
+        if key.startswith("API_KEY_"):
+            monkeypatch.delenv(key, raising=False)
 
 
 @pytest.fixture
