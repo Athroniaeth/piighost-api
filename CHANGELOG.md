@@ -1,3 +1,24 @@
+## 0.9.0 (2026-06-10)
+
+### BREAKING CHANGE
+
+- the server now refuses to start without API keys unless PIIGHOST_ALLOW_ANONYMOUS=true.
+- requires piighost >= 0.14. Lock refresh deferred until the lib release is published; local tests run against the editable sibling checkout.
+
+### Feat
+
+- **api**: wire the Redis cache for real via the [cache] TOML section
+- **api**: fail-fast auth with PIIGHOST_ALLOW_ANONYMOUS opt-out; body size and rate limits
+- **api**: DELETE /v1/threads/{thread_id} purge endpoint (right to be forgotten)
+
+### Fix
+
+- **api**: enforce auth guard at construction; validate rate-limit; surface compose knobs
+
+### Refactor
+
+- **api**: consume public piighost surface; dynamic version; manifest health
+
 ## 0.8.0 (2026-05-25)
 
 ### BREAKING CHANGE
