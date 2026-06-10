@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from litestar.testing import TestClient
 
 from piighost.exceptions import CacheMissError
@@ -158,8 +159,6 @@ def test_serialize_entities_no_match(mock_pipeline: MagicMock) -> None:
 def _make_mock_load_pipeline_result() -> tuple[MagicMock, MagicMock]:
     """Return (mock_pipeline, mock_manifest) matching create_app's expectations."""
     pipeline = MagicMock()
-    pipeline._detector = MagicMock()
-    pipeline._detector.labels = ["PERSON"]
     pipeline.ph_factory = LabelCounterPlaceholderFactory()
     pipeline.anonymize = AsyncMock(return_value=("anon", []))
     pipeline.get_resolved_entities = MagicMock(return_value=[])
@@ -239,6 +238,22 @@ def test_rate_limit_throttles_second_request(
         assert tc.get("/v1/labels").status_code == 429
         # Excluded paths are never throttled.
         assert tc.get("/health").status_code == 200
+
+
+def test_malformed_rate_limit_raises_clear_error(
+    monkeypatch, mock_pipeline: MagicMock
+) -> None:
+    """A malformed PIIGHOST_RATE_LIMIT must fail loudly at create_app time."""
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
+    mock_result = _make_mock_load_pipeline_result()
+
+    for bad in ("minute", "fortnight:5", "minute:0", "minute:-3", "minute:x"):
+        monkeypatch.setenv("PIIGHOST_RATE_LIMIT", bad)
+        with patch("piighost_api.app.load_pipeline", return_value=mock_result):
+            from piighost_api.app import create_app
+
+            with pytest.raises(ValueError, match="PIIGHOST_RATE_LIMIT"):
+                create_app(FIXTURES / "minimal.toml")
 
 
 # ------------------------------------------------------------------

@@ -51,6 +51,8 @@ For the Docker path:
 docker pull ghcr.io/athroniaeth/piighost-api:latest
 ```
 
+> **Note:** `docker compose up` now refuses to start unless either `API_KEY` is set (loaded as `API_KEY_default`) or `PIIGHOST_ALLOW_ANONYMOUS=true` is passed. This is the secure default: with no key and no explicit anonymous opt-in, the API will not serve PII endpoints unauthenticated. The compose file also surfaces `PIIGHOST_MAX_BODY_BYTES` and `PIIGHOST_RATE_LIMIT` so operators can tune them.
+
 ## Environment variables
 
 | Variable | Default | Description |

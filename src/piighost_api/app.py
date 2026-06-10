@@ -20,7 +20,7 @@ from piighost.exceptions import CacheMissError
 from piighost.models import Detection, Entity, Span
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
-from piighost_api.auth import create_auth_guard
+from piighost_api.auth import AuthState, create_auth_guard
 from piighost_api.observation import load_observation_service
 
 logger = logging.getLogger(__name__)
@@ -194,13 +194,19 @@ def create_app(config_path: Path) -> Litestar:
     repo = InMemoryApiKeyRepository()
     svc_api_keys = ApiKeyService(repo=repo, hasher=hasher)
 
-    guards: list = []
+    # The guard is registered once at construction time (see the Litestar(...)
+    # call below) and reads this mutable dict. The lifespan flips
+    # ``enabled`` to True after keys load successfully; because the guard
+    # captured the dict by reference, that flip is visible. Appending a guard
+    # to the ``guards`` list inside the lifespan would NOT work: Litestar
+    # copies and freezes per-handler guards during registration.
+    auth_state: AuthState = {"enabled": False, "svc": svc_api_keys}
 
     @asynccontextmanager
     async def lifespan(app: Litestar) -> AsyncGenerator[None]:
         try:
             await svc_api_keys.load_dotenv()
-            guards.append(create_auth_guard(svc_api_keys))
+            auth_state["enabled"] = True
             logger.info("API keys loaded, auth enabled")
         except Exception as exc:
             if os.getenv("PIIGHOST_ALLOW_ANONYMOUS", "").strip().lower() not in (
@@ -336,10 +342,34 @@ def create_app(config_path: Path) -> Litestar:
         # Format: "<unit>:<count>", e.g. "minute:300".
         from litestar.middleware.rate_limit import RateLimitConfig
 
-        unit, _, count = rate_limit_env.partition(":")
+        valid_units = ("second", "minute", "hour", "day")
+        unit, sep, count_str = rate_limit_env.partition(":")
+        if not sep or unit not in valid_units:
+            raise ValueError(
+                "Invalid PIIGHOST_RATE_LIMIT "
+                f"{rate_limit_env!r}. Expected format '<unit>:<count>' "
+                f"where <unit> is one of {valid_units} and <count> is a "
+                "positive integer, e.g. 'minute:300'."
+            )
+        try:
+            count = int(count_str)
+        except ValueError as exc:
+            raise ValueError(
+                "Invalid PIIGHOST_RATE_LIMIT "
+                f"{rate_limit_env!r}. The <count> must be a positive integer, "
+                f"got {count_str!r}. Expected format '<unit>:<count>', "
+                "e.g. 'minute:300'."
+            ) from exc
+        if count <= 0:
+            raise ValueError(
+                "Invalid PIIGHOST_RATE_LIMIT "
+                f"{rate_limit_env!r}. The <count> must be a positive integer, "
+                f"got {count}. Expected format '<unit>:<count>', "
+                "e.g. 'minute:300'."
+            )
         middleware.append(
             RateLimitConfig(
-                rate_limit=(unit, int(count)),  # pyrefly: ignore[bad-argument-type]
+                rate_limit=(unit, count),  # pyrefly: ignore[bad-argument-type]
                 # exclude takes regex patterns; anchor them so "/" does not
                 # match every path.
                 exclude=["^/health$", "^/$"],
@@ -358,7 +388,7 @@ def create_app(config_path: Path) -> Litestar:
             deanonymize_entities,
             forget_thread,
         ],
-        guards=guards,
+        guards=[create_auth_guard(auth_state)],
         lifespan=[lifespan],
         request_max_body_size=max_body,
         middleware=middleware,
