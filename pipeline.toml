@@ -18,3 +18,7 @@ patterns = { EU_IBAN = "\\b[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}[A-Z0-9]{0,16}\\b", EU
 name = "us"
 type = "regex"
 patterns = { US_SSN = "\\b(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}\\b", US_PHONE = "\\b(?:\\+1[\\s.\\-]?)?\\(?\\d{3}\\)?[\\s.\\-]?\\d{3}[\\s.\\-]?\\d{4}\\b", US_PASSPORT = "\\b[A-Z]\\d{8}\\b", US_ZIP_CODE = "\\b\\d{5}(?:-\\d{4})?\\b", US_EIN = "\\b\\d{2}-\\d{7}\\b", US_BANK_ROUTING = "\\b\\d{9}\\b" }
+
+[cache]
+type = "redis"
+url_env = "REDIS_URL"

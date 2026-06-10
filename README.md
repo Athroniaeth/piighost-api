@@ -58,6 +58,21 @@ docker pull ghcr.io/athroniaeth/piighost-api:latest
 | `PIIGHOST_ALLOW_ANONYMOUS` | unset | The server refuses to start without valid `API_KEY_<name>` entries. Set to `true` (or `1`, `yes`, `on`) to explicitly opt in to serving PII endpoints without authentication. |
 | `PIIGHOST_MAX_BODY_BYTES` | `1000000` | Maximum request body size in bytes. Larger requests are rejected with HTTP 413 before any NER inference runs. |
 | `PIIGHOST_RATE_LIMIT` | unset | Per-client rate limit as `<unit>:<count>` (e.g. `minute:300`, units: `second`, `minute`, `hour`, `day`). Excess requests get HTTP 429. `/` and `/health` are exempt. Disabled when unset. |
+| `REDIS_URL` | unset | Connection URL for the Redis anonymization cache. Required by the shipped `pipeline.toml`; see below. |
+
+## Cache configuration
+
+The shipped `pipeline.toml` configures a shared Redis cache:
+
+```toml
+[cache]
+type = "redis"
+url_env = "REDIS_URL"
+```
+
+With this config, `REDIS_URL` must be set. docker-compose provides it; without it, startup fails loudly with a `ConfigError` naming the missing variable rather than silently falling back. A shared backend is what keeps placeholder mappings consistent across workers behind a load balancer.
+
+For a bare-local run without Redis, point the server at a `pipeline.toml` that omits the `[cache]` section. The pipeline then uses the in-process memory cache. This is single-worker only: the mapping is not shared, so multiple workers would assign inconsistent placeholders for the same `thread_id`.
 
 ## Documentation
 
