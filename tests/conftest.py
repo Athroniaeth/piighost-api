@@ -97,7 +97,22 @@ def mock_manifest() -> MagicMock:
 
 
 @pytest.fixture
-def app(mock_pipeline: MagicMock, mock_manifest: MagicMock) -> Litestar:
+def allow_anonymous(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Opt in to anonymous mode so route tests keep their no-auth behavior.
+
+    Strict-mode startup tests must NOT use this fixture (they need the
+    variable absent).
+    """
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
+    monkeypatch.delenv("PIIGHOST_RATE_LIMIT", raising=False)
+
+
+@pytest.fixture
+def app(
+    mock_pipeline: MagicMock,
+    mock_manifest: MagicMock,
+    allow_anonymous: None,
+) -> Litestar:
     """Create a Litestar app with mock pipeline (bypasses load_pipeline)."""
     with patch(
         "piighost_api.app.load_pipeline", return_value=(mock_pipeline, mock_manifest)

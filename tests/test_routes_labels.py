@@ -10,7 +10,8 @@ from piighost_api.app import create_app
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def test_labels_returns_grouped_detector_labels():
+def test_labels_returns_grouped_detector_labels(monkeypatch):
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
     app = create_app(FIXTURES / "multi_detector.toml")
     with TestClient(app=app) as client:
         response = client.get("/v1/labels")
@@ -25,7 +26,8 @@ def test_labels_returns_grouped_detector_labels():
     assert "secondary" in names
 
 
-def test_v1_config_route_is_removed():
+def test_v1_config_route_is_removed(monkeypatch):
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
     app = create_app(FIXTURES / "minimal.toml")
     with TestClient(app=app) as client:
         response = client.get("/v1/config")

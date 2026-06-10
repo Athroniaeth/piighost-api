@@ -192,11 +192,14 @@ def test_lifespan_auth_success() -> None:
 
 
 def test_lifespan_auth_failure() -> None:
+    """Bad keys with explicit anonymous opt-in: app boots without auth."""
     mock_result = _make_mock_load_pipeline_result()
 
     with patch("piighost_api.app.load_pipeline", return_value=mock_result):
         with patch.dict(
-            "os.environ", {"API_KEY_bad": "invalid-key-format"}, clear=False
+            "os.environ",
+            {"API_KEY_bad": "invalid-key-format", "PIIGHOST_ALLOW_ANONYMOUS": "true"},
+            clear=False,
         ):
             from piighost_api.app import create_app
 
@@ -205,6 +208,37 @@ def test_lifespan_auth_failure() -> None:
             with TestClient(app=app) as tc:
                 response = tc.get("/v1/labels")
                 assert response.status_code == 200
+
+
+# ------------------------------------------------------------------
+# Request limits
+# ------------------------------------------------------------------
+
+
+def test_oversized_body_is_rejected(client: TestClient) -> None:
+    res = client.post("/v1/anonymize", json={"text": "x" * 2_000_000, "thread_id": "t"})
+    # The contract is "rejected, not processed": Litestar returns 413
+    # when the body exceeds request_max_body_size.
+    assert res.status_code == 413
+
+
+def test_rate_limit_throttles_second_request(
+    monkeypatch, mock_pipeline: MagicMock
+) -> None:
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
+    monkeypatch.setenv("PIIGHOST_RATE_LIMIT", "minute:1")
+    mock_result = _make_mock_load_pipeline_result()
+
+    with patch("piighost_api.app.load_pipeline", return_value=mock_result):
+        from piighost_api.app import create_app
+
+        app = create_app(FIXTURES / "minimal.toml")
+
+    with TestClient(app=app, raise_server_exceptions=False) as tc:
+        assert tc.get("/v1/labels").status_code == 200
+        assert tc.get("/v1/labels").status_code == 429
+        # Excluded paths are never throttled.
+        assert tc.get("/health").status_code == 200
 
 
 # ------------------------------------------------------------------

@@ -51,6 +51,14 @@ For the Docker path:
 docker pull ghcr.io/athroniaeth/piighost-api:latest
 ```
 
+## Environment variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PIIGHOST_ALLOW_ANONYMOUS` | unset | The server refuses to start without valid `API_KEY_<name>` entries. Set to `true` (or `1`, `yes`, `on`) to explicitly opt in to serving PII endpoints without authentication. |
+| `PIIGHOST_MAX_BODY_BYTES` | `1000000` | Maximum request body size in bytes. Larger requests are rejected with HTTP 413 before any NER inference runs. |
+| `PIIGHOST_RATE_LIMIT` | unset | Per-client rate limit as `<unit>:<count>` (e.g. `minute:300`, units: `second`, `minute`, `hour`, `day`). Excess requests get HTTP 429. `/` and `/health` are exempt. Disabled when unset. |
+
 ## Documentation
 
 - [Installation](https://athroniaeth.github.io/piighost-api/getting-started/installation/)

@@ -201,9 +201,21 @@ def create_app(config_path: Path) -> Litestar:
         try:
             await svc_api_keys.load_dotenv()
             guards.append(create_auth_guard(svc_api_keys))
-            logger.info("API keys loaded — auth enabled")
+            logger.info("API keys loaded, auth enabled")
         except Exception as exc:
-            logger.warning("No valid API keys found (%s) — auth disabled", exc)
+            if os.getenv("PIIGHOST_ALLOW_ANONYMOUS", "").strip().lower() not in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            ):
+                raise RuntimeError(
+                    "No valid API keys found and PIIGHOST_ALLOW_ANONYMOUS is not "
+                    "set. Refusing to serve PII endpoints unauthenticated; define "
+                    "API_KEY_<name> entries or explicitly opt in to anonymous "
+                    "mode with PIIGHOST_ALLOW_ANONYMOUS=true."
+                ) from exc
+            logger.warning("Anonymous mode enabled (%s), auth disabled", exc)
         logger.info(
             "Pipeline ready: %s (%d detector(s))",
             manifest.name or "<unnamed>",
@@ -316,6 +328,24 @@ def create_app(config_path: Path) -> Litestar:
         """
         await pipeline.forget_thread(thread_id)
 
+    max_body = int(os.getenv("PIIGHOST_MAX_BODY_BYTES", "1000000"))
+
+    middleware = []
+    rate_limit_env = os.getenv("PIIGHOST_RATE_LIMIT", "")
+    if rate_limit_env:
+        # Format: "<unit>:<count>", e.g. "minute:300".
+        from litestar.middleware.rate_limit import RateLimitConfig
+
+        unit, _, count = rate_limit_env.partition(":")
+        middleware.append(
+            RateLimitConfig(
+                rate_limit=(unit, int(count)),  # pyrefly: ignore[bad-argument-type]
+                # exclude takes regex patterns; anchor them so "/" does not
+                # match every path.
+                exclude=["^/health$", "^/$"],
+            ).middleware
+        )
+
     return Litestar(
         route_handlers=[
             index,
@@ -330,6 +360,8 @@ def create_app(config_path: Path) -> Litestar:
         ],
         guards=guards,
         lifespan=[lifespan],
+        request_max_body_size=max_body,
+        middleware=middleware,
         openapi_config=OpenAPIConfig(
             title="piighost-api",
             version=API_VERSION,
