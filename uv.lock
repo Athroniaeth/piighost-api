@@ -15,6 +15,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/37/d7/15d67e05b235d1ed8c3ce61688fe4d84130e72af1657acadfaac3479f4cf/aiocache-0.12.3-py2.py3-none-any.whl", hash = "sha256:889086fc24710f431937b87ad3720a289f7fc31c4fd8b68e9f918b9bacd8270d", size = 28199, upload-time = "2024-09-25T13:20:22.688Z" },
 ]
 
+[package.optional-dependencies]
+redis = [
+    { name = "redis" },
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -1424,14 +1429,14 @@ wheels = [
 
 [[package]]
 name = "piighost"
-version = "0.12.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/76/c8/c0f5babbae9dadca6b1bc920b17b040c8852b9b51d39f20922e0ad020c8a/piighost-0.12.0.tar.gz", hash = "sha256:4fd33e3fb26a76a1cc55def07b00c9727d11f5b91a74a61c8bb3932f0caf0122", size = 1070871, upload-time = "2026-05-25T15:33:26.158Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/f8/f585760938dbec9d41b7a34ecf15180c0c0cb320a7932a02fa8b7e8490f2/piighost-0.14.0.tar.gz", hash = "sha256:748399a098279b0ff3df612d7dc6ab40819cf824280dce665fb8307d71807489", size = 1123706, upload-time = "2026-06-10T05:14:48.443Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/27/cf2c560dbcf3a4427317f7821647b8d12ae2a2a19e6d31b29d5855c2b640/piighost-0.12.0-py3-none-any.whl", hash = "sha256:492bd06af60cff55822e3f02b34efba8ca7653b85c23e281bc8b5fa3415cff37", size = 107222, upload-time = "2026-05-25T15:33:24.483Z" },
+    { url = "https://files.pythonhosted.org/packages/66/35/53e622fcbe849bfac32f51d78daeefe3f20db42ed80436a147b367612106/piighost-0.14.0-py3-none-any.whl", hash = "sha256:75f2dac15c762b3f3bf72c604fc2f10fb69630dc0b5be073a6b0212c69e15285", size = 117264, upload-time = "2026-06-10T05:14:47.002Z" },
 ]
 
 [package.optional-dependencies]
@@ -1445,6 +1450,9 @@ langfuse = [
 opik = [
     { name = "opik" },
 ]
+redis = [
+    { name = "aiocache", extra = ["redis"] },
+]
 
 [[package]]
 name = "piighost-api"
@@ -1455,7 +1463,7 @@ dependencies = [
     { name = "keyshield", extra = ["argon2"] },
     { name = "litestar" },
     { name = "msgspec" },
-    { name = "piighost", extra = ["config"] },
+    { name = "piighost", extra = ["config", "redis"] },
     { name = "requests" },
     { name = "typer" },
     { name = "uvicorn" },
@@ -1490,7 +1498,7 @@ requires-dist = [
     { name = "langfuse", marker = "extra == 'dataset'", specifier = ">=3.0" },
     { name = "litestar", specifier = ">=2.16" },
     { name = "msgspec", specifier = ">=0.19" },
-    { name = "piighost", extras = ["config"], specifier = ">=0.12" },
+    { name = "piighost", extras = ["config", "redis"], specifier = ">=0.14" },
     { name = "piighost", extras = ["langfuse"], marker = "extra == 'langfuse'" },
     { name = "piighost", extras = ["opik"], marker = "extra == 'opik'" },
     { name = "python-dotenv", marker = "extra == 'dataset'", specifier = ">=1.0" },
@@ -1953,6 +1961,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/ce/ff942d19fce5385054650bb71a58495ddda299d94661ccc4e6e7fa44868b/rapidfuzz-3.14.5-cp314-cp314t-win32.whl", hash = "sha256:0f23e37019ec07712d58976b1ab2b889f8649a7f7c2f626a2f34ea9139e79279", size = 1803950, upload-time = "2026-04-07T11:16:10.873Z" },
     { url = "https://files.pythonhosted.org/packages/5c/0f/9aafc63f9661222b819b391c187eed29fc90ad5935f9690e5ecc2d2047a4/rapidfuzz-3.14.5-cp314-cp314t-win_amd64.whl", hash = "sha256:7d5ca9c7832e6879a707296d1463685f7c243a27846227044504741640caec66", size = 1632357, upload-time = "2026-04-07T11:16:13.1Z" },
     { url = "https://files.pythonhosted.org/packages/70/a6/51fc1b0e61e3326e1c68a61cfd0c6b3c34c843681c4b1eefbf0596f59162/rapidfuzz-3.14.5-cp314-cp314t-win_arm64.whl", hash = "sha256:3e91dcd2549b8f8d843f98ba03a17e01f3d8b72ce942adbbb6761bc58ffce813", size = 855409, upload-time = "2026-04-07T11:16:15.787Z" },
+]
+
+[[package]]
+name = "redis"
+version = "8.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/ae/ed461cca5780b5fc8b9fe8ca0ed98d89508645fb9d880c24cc42c087678f/redis-8.0.0.tar.gz", hash = "sha256:a00c5355432051ac14e593b8b197fc76c887ee12d55a0984f69328a1115fdc49", size = 5101591, upload-time = "2026-05-28T12:45:13.5Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/e3/b519734372d305bd547534a9f32e4ce9f98552af753dce72cf3483a0ff0b/redis-8.0.0-py3-none-any.whl", hash = "sha256:c938c18338585009f0bc310f4c7e4e4b4d37639356c4ac072cedf3af570c8dc7", size = 499870, upload-time = "2026-05-28T12:45:11.697Z" },
 ]
 
 [[package]]
