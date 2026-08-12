@@ -1,3 +1,12 @@
-[[detectors]]
+[detector]
 type = "regex"
 patterns = { EMAIL = "[a-z]+@[a-z]+\\.[a-z]+" }
+
+[linker]
+type = "exact"
+
+[anonymizer.placeholder]
+type = "label_counter"
+
+[memory]
+type = "in_memory"

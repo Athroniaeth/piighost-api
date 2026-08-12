@@ -1,6 +1,6 @@
 [project]
 name = "piighost-api"
-version = "0.9.0"
+version = "1.0.0"
 description = "REST API server for piighost PII anonymization inference."
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,19 +29,24 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "piighost[config,redis]>=0.14",
+    "piighost[config,redis]>=1.0",
     "keyshield[argon2]>=2.0",
     "litestar>=2.16",
     "uvicorn>=0.34",
-    "aiocache>=0.12",
     "msgspec>=0.19",
     "requests>=2.32",
     "typer>=0.12",
 ]
 
 [project.optional-dependencies]
-langfuse = ["piighost[langfuse]"]
-opik = ["piighost[opik]"]
+# Export piighost's OpenTelemetry spans to an OTLP endpoint (Langfuse, Opik,
+# Phoenix, ...). piighost v2 is OTel-native, so observation is configured at
+# deploy time through the standard OTEL_* environment variables.
+observation = [
+    "piighost[observation]",
+    "opentelemetry-sdk>=1.30",
+    "opentelemetry-exporter-otlp>=1.30",
+]
 # Dataset CLI dependencies. Pulls the Langfuse SDK so the
 # ``piighost-api dataset extract`` command can talk to the observation
 # backend directly. python-dotenv lets the CLI auto-load a .env from

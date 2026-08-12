@@ -1,8 +1,19 @@
-"""Litestar application with PII anonymization API routes."""
+"""Litestar application with PII anonymization API routes.
+
+The routes serve the contract the piighost ``PIIGhostClient`` calls, so a remote
+``ThreadAnonymizationPipeline`` drives this server exactly like a local pipeline:
+
+* ``POST /v1/anonymize`` -> ``{anonymized_text, entities}``
+* ``POST /v1/anonymize/corrected`` -> ``{anonymized_text}``
+* ``POST /v1/deanonymize`` -> ``{text}``
+* ``DELETE /v1/threads/{id}`` -> ``{messages, detections}``
+
+plus a detection preview and health/labels endpoints for human consumers.
+"""
 
 import logging
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
@@ -11,17 +22,16 @@ import msgspec
 from keyshield import ApiKeyService
 from keyshield.hasher.argon2 import Argon2ApiKeyHasher
 from keyshield.repositories.in_memory import InMemoryApiKeyRepository
-from litestar import Litestar, delete, get, post, put
-from litestar.exceptions import NotFoundException
+from litestar import Litestar, delete, get, post
 from litestar.openapi import OpenAPIConfig
 
-from piighost.config import load_pipeline
-from piighost.exceptions import CacheMissError
+from piighost.config import load_config, load_thread_pipeline
+from piighost.conversation_memory import MessageRole
 from piighost.models import Detection, Entity, Span
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import AuthState, create_auth_guard
-from piighost_api.observation import load_observation_service
+from piighost_api.observation import configure_observation
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +57,30 @@ class EntitySchema(msgspec.Struct):
     detections: list[DetectionSchema]
 
 
+class CorrectedDetectionSchema(msgspec.Struct):
+    """A detection as produced by ``piighost.models.Detection.to_dict()``."""
+
+    text: str
+    label: str
+    start: int
+    end: int
+    confidence: float
+
+
 class DetectRequest(msgspec.Struct):
     text: str
     thread_id: str = "default"
 
 
-class OverrideDetectRequest(msgspec.Struct):
-    text: str
-    detections: list[DetectionSchema]
-    thread_id: str = "default"
-
-
 class AnonymizeRequest(msgspec.Struct):
     text: str
+    thread_id: str = "default"
+    role: str = "user"
+
+
+class AnonymizeCorrectedRequest(msgspec.Struct):
+    text: str
+    detections: list[CorrectedDetectionSchema]
     thread_id: str = "default"
 
 
@@ -73,33 +94,21 @@ class AnonymizeResponse(msgspec.Struct):
     entities: list[EntitySchema]
 
 
+class AnonymizeCorrectedResponse(msgspec.Struct):
+    anonymized_text: str
+
+
 class DeanonymizeResponse(msgspec.Struct):
     text: str
-    entities: list[EntitySchema]
 
 
 class DetectResponse(msgspec.Struct):
     entities: list[EntitySchema]
 
 
-class DeanonymizeEntResponse(msgspec.Struct):
-    text: str
-
-
-class DetectorLabelsSchema(msgspec.Struct):
-    name: str | None
-    type: str
-    labels: list[str]
-
-
-class PipelineMetaSchema(msgspec.Struct):
-    name: str | None
-    schema_version: int
-
-
-class LabelsResponse(msgspec.Struct):
-    pipeline: PipelineMetaSchema
-    detectors: list[DetectorLabelsSchema]
+class ForgetResponse(msgspec.Struct):
+    messages: int
+    detections: int
 
 
 class IndexResponse(msgspec.Struct):
@@ -113,59 +122,49 @@ class HealthResponse(msgspec.Struct):
     detector: str
 
 
+class LabelsResponse(msgspec.Struct):
+    name: str | None
+    detector: str
+
+
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 
 
-def _serialize_entities(
-    entities: list[Entity],
-    pipeline: ThreadAnonymizationPipeline,
-    thread_id: str,
-) -> list[EntitySchema]:
-    """Serialize piighost entities with their placeholder tokens."""
-    tokens = pipeline.get_resolved_tokens(thread_id)
-    token_lookup = {ent.canonical_key: tok for ent, tok in tokens.items()}
+def _detection_schema(detection: Detection) -> DetectionSchema:
+    """Serialize a piighost Detection to the API wire shape."""
+    return DetectionSchema(
+        text=detection.text,
+        label=detection.label,
+        start_pos=detection.span.start,
+        end_pos=detection.span.end,
+        confidence=detection.confidence,
+    )
 
-    result: list[EntitySchema] = []
-    for entity in entities:
-        placeholder = token_lookup.get(entity.canonical_key, "")
-        detections = [
-            DetectionSchema(
-                text=d.text,
-                label=d.label,
-                start_pos=d.position.start_pos,
-                end_pos=d.position.end_pos,
-                confidence=d.confidence,
-            )
-            for d in entity.detections
-        ]
-        result.append(
-            EntitySchema(
-                label=entity.label, placeholder=placeholder, detections=detections
-            )
+
+def _serialize_tokens(tokens: Mapping[Entity, str]) -> list[EntitySchema]:
+    """Serialize an anonymization's entity-to-token mapping."""
+    return [
+        EntitySchema(
+            label=entity.label,
+            placeholder=str(token),
+            detections=[_detection_schema(d) for d in entity.detections],
         )
-    return result
+        for entity, token in tokens.items()
+    ]
 
 
 def _serialize_entities_plain(entities: list[Entity]) -> list[EntitySchema]:
     """Serialize entities without placeholder tokens (for detection preview)."""
-    result: list[EntitySchema] = []
-    for entity in entities:
-        detections = [
-            DetectionSchema(
-                text=d.text,
-                label=d.label,
-                start_pos=d.position.start_pos,
-                end_pos=d.position.end_pos,
-                confidence=d.confidence,
-            )
-            for d in entity.detections
-        ]
-        result.append(
-            EntitySchema(label=entity.label, placeholder="", detections=detections)
+    return [
+        EntitySchema(
+            label=entity.label,
+            placeholder="",
+            detections=[_detection_schema(d) for d in entity.detections],
         )
-    return result
+        for entity in entities
+    ]
 
 
 # ------------------------------------------------------------------
@@ -177,17 +176,17 @@ def create_app(config_path: Path) -> Litestar:
     """Create and configure the Litestar application.
 
     Args:
-        config_path: Path to a piighost TOML configuration file.
+        config_path: Path to a piighost TOML or JSON configuration file.
 
     Returns:
         A fully configured ``Litestar`` instance.
     """
-    pipeline, manifest = load_pipeline(config_path)
+    config = load_config(config_path)
+    pipeline: ThreadAnonymizationPipeline = load_thread_pipeline(config_path)
+    detector_type = config.detector.type
 
-    observation = load_observation_service()
-    if observation is not None:
-        pipeline.observation = observation
-        logger.info("Observation enabled: %s", type(observation).__name__)
+    if configure_observation():
+        logger.info("Observation export enabled")
 
     pepper = os.getenv("SECRET_PEPPER")
     hasher = Argon2ApiKeyHasher(pepper=pepper)
@@ -223,9 +222,9 @@ def create_app(config_path: Path) -> Litestar:
                 ) from exc
             logger.warning("Anonymous mode enabled (%s), auth disabled", exc)
         logger.info(
-            "Pipeline ready: %s (%d detector(s))",
-            manifest.name or "<unnamed>",
-            len(manifest.detectors),
+            "Pipeline ready: %s (detector: %s)",
+            config.name or "<unnamed>",
+            detector_type,
         )
         yield
 
@@ -243,96 +242,67 @@ def create_app(config_path: Path) -> Litestar:
 
     @get("/health", exclude_from_auth=True)
     async def health() -> HealthResponse:
-        return HealthResponse(
-            status="ok",
-            detector=", ".join(d.type for d in manifest.detectors) or "none",
-        )
+        return HealthResponse(status="ok", detector=detector_type)
 
     @get("/v1/labels", exclude_from_auth=True)
     async def labels() -> LabelsResponse:
-        return LabelsResponse(
-            pipeline=PipelineMetaSchema(
-                name=manifest.name,
-                schema_version=manifest.schema_version,
-            ),
-            detectors=[
-                DetectorLabelsSchema(name=d.name, type=d.type, labels=d.labels)
-                for d in manifest.detectors
-            ],
-        )
+        return LabelsResponse(name=config.name, detector=detector_type)
 
     @post("/v1/detect")
     async def detect(data: DetectRequest) -> DetectResponse:
-        entities = await pipeline.detect_entities(data.text, thread_id=data.thread_id)
+        detections = await pipeline.detector.detect(data.text)
+        entities = pipeline.linker.link(detections)
         return DetectResponse(entities=_serialize_entities_plain(entities))
 
-    @put("/v1/detect")
-    async def override_detect(data: OverrideDetectRequest) -> None:
+    @post("/v1/anonymize")
+    async def anonymize(data: AnonymizeRequest) -> AnonymizeResponse:
+        result = await pipeline.anonymize(
+            data.text,
+            data.thread_id,
+            role=MessageRole(data.role),
+        )
+        return AnonymizeResponse(
+            anonymized_text=result.text,
+            entities=_serialize_tokens(result.tokens),
+        )
+
+    @post("/v1/anonymize/corrected")
+    async def anonymize_corrected(
+        data: AnonymizeCorrectedRequest,
+    ) -> AnonymizeCorrectedResponse:
         detections = [
             Detection(
+                span=Span(d.start, d.end),
                 text=d.text,
                 label=d.label,
-                position=Span(d.start_pos, d.end_pos),
                 confidence=d.confidence,
             )
             for d in data.detections
         ]
-        await pipeline.override_detections(
+        result = await pipeline.anonymize_corrected(
             data.text,
+            data.thread_id,
             detections,
-            thread_id=data.thread_id,
         )
-
-    @post("/v1/anonymize")
-    async def anonymize(data: AnonymizeRequest) -> AnonymizeResponse:
-        anonymized_text, entities = await pipeline.anonymize(
-            data.text,
-            thread_id=data.thread_id,
-        )
-        return AnonymizeResponse(
-            anonymized_text=anonymized_text,
-            entities=_serialize_entities(
-                entities,
-                pipeline,
-                data.thread_id,
-            ),
-        )
+        return AnonymizeCorrectedResponse(anonymized_text=result.text)
 
     @post("/v1/deanonymize")
     async def deanonymize(data: DeanonymizeRequest) -> DeanonymizeResponse:
-        try:
-            original, entities = await pipeline.deanonymize(
-                data.text,
-                thread_id=data.thread_id,
-            )
-        except CacheMissError:
-            raise NotFoundException("No cached mapping found for this text")
+        text = await pipeline.deanonymize(data.text, data.thread_id)
+        return DeanonymizeResponse(text=text)
 
-        return DeanonymizeResponse(
-            text=original,
-            entities=_serialize_entities(
-                entities,
-                pipeline,
-                data.thread_id,
-            ),
-        )
+    @delete("/v1/threads/{thread_id:str}", status_code=200)
+    async def forget_thread(thread_id: str) -> ForgetResponse:
+        """Erase every trace of a conversation (right to be forgotten).
 
-    @post("/v1/deanonymize/entities")
-    async def deanonymize_entities(data: DeanonymizeRequest) -> DeanonymizeEntResponse:
-        result = await pipeline.deanonymize_with_ent(
-            data.text,
-            thread_id=data.thread_id,
-        )
-        return DeanonymizeEntResponse(text=result)
-
-    @delete("/v1/threads/{thread_id:str}")
-    async def forget_thread(thread_id: str) -> None:
-        """Erase every trace of a conversation: memory and cached mappings.
-
-        Backed by ``ThreadAnonymizationPipeline.forget_thread`` (right to
-        be forgotten). Idempotent.
+        Backed by ``ThreadAnonymizationPipeline.forget_thread``. Idempotent, and
+        reports how many messages and detections were dropped.
         """
-        await pipeline.forget_thread(thread_id)
+        forgotten = await pipeline.forget_thread(thread_id)
+        return ForgetResponse(
+            messages=forgotten.messages,
+            detections=forgotten.detections,
+        )
 
     max_body = int(os.getenv("PIIGHOST_MAX_BODY_BYTES", "1000000"))
 
@@ -382,10 +352,9 @@ def create_app(config_path: Path) -> Litestar:
             health,
             labels,
             detect,
-            override_detect,
             anonymize,
+            anonymize_corrected,
             deanonymize,
-            deanonymize_entities,
             forget_thread,
         ],
         guards=[create_auth_guard(auth_state)],

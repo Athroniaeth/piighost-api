@@ -1,3 +1,25 @@
+## 1.0.0 (unreleased)
+
+Migrate the server to piighost 1.0 (the v2 rewrite). The routes now serve the
+exact contract the piighost ``PIIGhostClient`` calls, so a remote pipeline drives
+the server like a local one.
+
+### BREAKING CHANGE
+
+- Requires piighost >= 1.0.
+- Corrected detections move from ``PUT /v1/detect`` to ``POST /v1/anonymize/corrected``, matching the client.
+- ``POST /v1/deanonymize`` returns only ``{text}``; the redundant ``POST /v1/deanonymize/entities`` is removed, since v2 deanonymize does not return entities.
+- ``POST /v1/anonymize`` accepts a ``role`` (user or assistant) and no longer depends on a cache, so there is no cached-mapping 404.
+- ``DELETE /v1/threads/{id}`` now returns ``{messages, detections}`` instead of a bare 204.
+
+### Feat
+
+- **observation**: OpenTelemetry-native. The pipeline's spans export to any OTLP backend (Langfuse, Opik, Phoenix, ...) through the standard ``OTEL_*`` environment variables. The Langfuse and Opik piighost adapters are gone; use the ``observation`` extra.
+
+### Changed
+
+- Drop the dead ``langfuse`` and ``opik`` extras and the unused ``aiocache`` dependency.
+
 ## 0.9.0 (2026-06-10)
 
 ### BREAKING CHANGE

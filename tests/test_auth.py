@@ -61,10 +61,11 @@ def test_invalid_api_key() -> None:
 # ------------------------------------------------------------------
 
 
-def _build_app(mock_pipeline: MagicMock, mock_manifest: MagicMock) -> Litestar:
+def _build_app(mock_pipeline: MagicMock, mock_config: MagicMock) -> Litestar:
     """Build the real app with a mocked pipeline (same patching as the app fixture)."""
-    with patch(
-        "piighost_api.app.load_pipeline", return_value=(mock_pipeline, mock_manifest)
+    with (
+        patch("piighost_api.app.load_config", return_value=mock_config),
+        patch("piighost_api.app.load_thread_pipeline", return_value=mock_pipeline),
     ):
         from piighost_api.app import create_app
 
@@ -91,7 +92,7 @@ def test_guard_noops_when_auth_disabled() -> None:
 def test_startup_fails_without_keys_by_default(
     monkeypatch: pytest.MonkeyPatch,
     mock_pipeline: MagicMock,
-    mock_manifest: MagicMock,
+    mock_config: MagicMock,
 ) -> None:
     """No API keys and no explicit anonymous opt-in: startup must fail."""
     monkeypatch.delenv("PIIGHOST_ALLOW_ANONYMOUS", raising=False)
@@ -100,7 +101,7 @@ def test_startup_fails_without_keys_by_default(
     for key in list(os.environ):
         if key.startswith("API_KEY_"):
             monkeypatch.delenv(key, raising=False)
-    app = _build_app(mock_pipeline, mock_manifest)
+    app = _build_app(mock_pipeline, mock_config)
     # Litestar's lifespan runs in a task group: the startup error surfaces
     # wrapped in an ExceptionGroup.
     with pytest.raises(ExceptionGroup) as excinfo:
@@ -112,10 +113,10 @@ def test_startup_fails_without_keys_by_default(
 def test_startup_allows_anonymous_with_explicit_opt_in(
     monkeypatch: pytest.MonkeyPatch,
     mock_pipeline: MagicMock,
-    mock_manifest: MagicMock,
+    mock_config: MagicMock,
 ) -> None:
     monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
-    app = _build_app(mock_pipeline, mock_manifest)
+    app = _build_app(mock_pipeline, mock_config)
     with TestClient(app=app) as tc:
         assert tc.get("/health").status_code == 200
 
@@ -135,11 +136,11 @@ _VALID_KEY = "ak_v1-testkeyid000001-testsecretvaluethatislongenoughforkeyshield1
 def test_protected_route_401s_without_bearer_when_auth_enabled(
     monkeypatch: pytest.MonkeyPatch,
     mock_pipeline: MagicMock,
-    mock_manifest: MagicMock,
+    mock_config: MagicMock,
 ) -> None:
     monkeypatch.setenv("API_KEY_default", _VALID_KEY)
     monkeypatch.delenv("PIIGHOST_ALLOW_ANONYMOUS", raising=False)
-    app = _build_app(mock_pipeline, mock_manifest)
+    app = _build_app(mock_pipeline, mock_config)
     with TestClient(app=app) as tc:
         # No Authorization header: protected routes must be rejected.
         assert (
@@ -156,11 +157,11 @@ def test_protected_route_401s_without_bearer_when_auth_enabled(
 def test_valid_bearer_is_accepted_when_auth_enabled(
     monkeypatch: pytest.MonkeyPatch,
     mock_pipeline: MagicMock,
-    mock_manifest: MagicMock,
+    mock_config: MagicMock,
 ) -> None:
     monkeypatch.setenv("API_KEY_default", _VALID_KEY)
     monkeypatch.delenv("PIIGHOST_ALLOW_ANONYMOUS", raising=False)
-    app = _build_app(mock_pipeline, mock_manifest)
+    app = _build_app(mock_pipeline, mock_config)
     with TestClient(app=app) as tc:
         ok = tc.post(
             "/v1/anonymize",

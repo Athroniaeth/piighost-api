@@ -1,7 +1,6 @@
 """Shared fixtures for piighost-api tests."""
 
 import os
-
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,8 +9,9 @@ import pytest
 from litestar import Litestar
 from litestar.testing import TestClient
 
+from piighost.components.anonymizer.base import Anonymization
+from piighost.conversation_memory import Forgotten
 from piighost.models import Detection, Entity, Span
-from piighost.placeholder import LabelCounterPlaceholderFactory
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -19,83 +19,66 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def _make_entity(
     text: str, label: str, start: int, end: int, confidence: float = 0.95
 ) -> Entity:
-    return Entity(
-        detections=(
-            Detection(
-                text=text,
-                label=label,
-                position=Span(start, end),
-                confidence=confidence,
-            ),
-        )
+    detection = Detection(
+        span=Span(start, end),
+        text=text,
+        label=label,
+        confidence=confidence,
     )
+    return Entity(detections=(detection,))
 
 
-ENTITY_PERSON = _make_entity(
-    "Patrick",
-    "PERSON",
-    0,
-    7,
-)
-ENTITY_LOCATION = _make_entity(
-    "Paris",
-    "LOCATION",
-    17,
-    22,
-    confidence=0.92,
-)
+ENTITY_PERSON = _make_entity("Patrick", "PERSON", 0, 7)
+ENTITY_LOCATION = _make_entity("Paris", "LOCATION", 17, 22, confidence=0.92)
+
+TOKENS: dict[Entity, str] = {
+    ENTITY_PERSON: "<<PERSON:1>>",
+    ENTITY_LOCATION: "<<LOCATION:1>>",
+}
 
 
 @pytest.fixture
 def mock_pipeline() -> MagicMock:
-    """Mock ThreadAnonymizationPipeline with async methods."""
+    """Mock ThreadAnonymizationPipeline exposing the v2 async API.
+
+    anonymize/anonymize_corrected return an Anonymization (text + entity-to-token
+    map), deanonymize returns a plain string, forget_thread returns a Forgotten,
+    and the detect preview reads the pipeline's detector and linker.
+    """
     pipeline = MagicMock()
 
     pipeline.anonymize = AsyncMock(
-        return_value=(
-            "<<PERSON:1>> habite à <<LOCATION:1>>",
-            [ENTITY_PERSON, ENTITY_LOCATION],
+        return_value=Anonymization(
+            text="<<PERSON:1>> habite à <<LOCATION:1>>",
+            tokens=dict(TOKENS),
         )
     )
-    pipeline.deanonymize = AsyncMock(
-        return_value=("Patrick habite à Paris", [ENTITY_PERSON, ENTITY_LOCATION])
+    pipeline.anonymize_corrected = AsyncMock(
+        return_value=Anonymization(
+            text="<<PERSON:1>> habite à <<LOCATION:1>>",
+            tokens=dict(TOKENS),
+        )
     )
-    pipeline.deanonymize_with_ent = AsyncMock(return_value="Patrick aime Paris")
+    pipeline.deanonymize = AsyncMock(return_value="Patrick habite à Paris")
+    pipeline.forget_thread = AsyncMock(return_value=Forgotten(messages=2, detections=3))
 
-    pipeline.detect_entities = AsyncMock(return_value=[ENTITY_PERSON, ENTITY_LOCATION])
-    pipeline.forget_thread = AsyncMock()
-
-    pipeline.get_resolved_entities = MagicMock(
-        return_value=[ENTITY_PERSON, ENTITY_LOCATION]
+    pipeline.detector = MagicMock()
+    pipeline.detector.detect = AsyncMock(
+        return_value=[ENTITY_PERSON.detections[0], ENTITY_LOCATION.detections[0]]
     )
-    pipeline.get_resolved_tokens = MagicMock(
-        return_value={
-            ENTITY_PERSON: "<<PERSON:1>>",
-            ENTITY_LOCATION: "<<LOCATION:1>>",
-        }
-    )
-
-    ph_factory = LabelCounterPlaceholderFactory()
-    pipeline.ph_factory = ph_factory
-
-    pipeline._detector = MagicMock()
-    pipeline._detector.labels = ["PERSON", "LOCATION"]
+    pipeline.linker = MagicMock()
+    pipeline.linker.link = MagicMock(return_value=[ENTITY_PERSON, ENTITY_LOCATION])
 
     return pipeline
 
 
 @pytest.fixture
-def mock_manifest() -> MagicMock:
-    """Mock pipeline manifest returned alongside the pipeline by load_pipeline."""
-    manifest = MagicMock()
-    manifest.name = "test"
-    manifest.schema_version = 1
-    detector = MagicMock()
-    detector.name = "default"
-    detector.type = "exact"
-    detector.labels = ["PERSON", "LOCATION"]
-    manifest.detectors = [detector]
-    return manifest
+def mock_config() -> MagicMock:
+    """Mock PipelineConfig, source of the /health and /v1/labels metadata."""
+    config = MagicMock()
+    config.name = "test"
+    config.detector.type = "regex"
+    return config
 
 
 @pytest.fixture
@@ -118,12 +101,13 @@ def allow_anonymous(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def app(
     mock_pipeline: MagicMock,
-    mock_manifest: MagicMock,
+    mock_config: MagicMock,
     allow_anonymous: None,
 ) -> Litestar:
-    """Create a Litestar app with mock pipeline (bypasses load_pipeline)."""
-    with patch(
-        "piighost_api.app.load_pipeline", return_value=(mock_pipeline, mock_manifest)
+    """Create a Litestar app with a mock pipeline (bypasses config loading)."""
+    with (
+        patch("piighost_api.app.load_config", return_value=mock_config),
+        patch("piighost_api.app.load_thread_pipeline", return_value=mock_pipeline),
     ):
         from piighost_api.app import create_app
 
