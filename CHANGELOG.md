@@ -15,6 +15,7 @@ the server like a local one.
 ### Feat
 
 - **observation**: OpenTelemetry-native. The pipeline's spans export to any OTLP backend (Langfuse, Opik, Phoenix, ...) through the standard ``OTEL_*`` environment variables. The Langfuse and Opik piighost adapters are gone; use the ``observation`` extra.
+- **labels**: ``GET /v1/labels`` now also returns the detector's label vocabulary, so a client can offer the full set of labels for human correction. Derived from the detector config: regex pattern keys (inline plus catalogs), NER/LLM declared labels, unioned across a composite.
 
 ### Changed
 

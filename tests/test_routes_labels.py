@@ -19,6 +19,8 @@ def test_labels_reports_name_and_detector(monkeypatch) -> None:
     body = response.json()
     assert body["name"] == "demo"
     assert body["detector"] == "composite"
+    # The vocabulary unions the composite's two regex detectors (EMAIL, IP_V4).
+    assert body["labels"] == ["EMAIL", "IP_V4"]
 
 
 def test_v1_config_route_is_removed(monkeypatch) -> None:

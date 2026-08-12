@@ -25,6 +25,12 @@ from keyshield.repositories.in_memory import InMemoryApiKeyRepository
 from litestar import Litestar, delete, get, post
 from litestar.openapi import OpenAPIConfig
 
+from piighost.components.detector.patterns import (
+    EU_PATTERNS,
+    FR_PATTERNS,
+    GENERIC_PATTERNS,
+    US_PATTERNS,
+)
 from piighost.config import load_config, load_thread_pipeline
 from piighost.conversation_memory import MessageRole
 from piighost.models import Detection, Entity, Span
@@ -125,11 +131,61 @@ class HealthResponse(msgspec.Struct):
 class LabelsResponse(msgspec.Struct):
     name: str | None
     detector: str
+    labels: list[str]
 
 
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+_CATALOGS: dict[str, dict[str, str]] = {
+    "generic": GENERIC_PATTERNS,
+    "us": US_PATTERNS,
+    "eu": EU_PATTERNS,
+    "fr": FR_PATTERNS,
+}
+
+
+def _detector_labels(config: object) -> set[str]:
+    """Collect the label vocabulary a detector config can emit.
+
+    Walks the detector config tree so the /v1/labels route can offer the full
+    set of labels a human corrector may reassign. Regex labels are the pattern
+    keys, inline ones plus the merged catalogs; NER and LLM labels are the
+    declared labels, or the external keys when a raw-to-canonical mapping is
+    given; a composite or chunked detector contributes its children's labels. An
+    unknown detector type contributes nothing.
+    """
+    detector_type = getattr(config, "type", None)
+
+    if detector_type == "regex":
+        labels = set(getattr(config, "patterns", {}))
+        for catalog in getattr(config, "catalogs", []):
+            labels |= set(_CATALOGS.get(catalog, {}))
+        return labels
+
+    if detector_type == "composite":
+        labels = set()
+        for child in getattr(config, "detectors", []):
+            labels |= _detector_labels(child)
+        return labels
+
+    if detector_type == "chunked":
+        return _detector_labels(getattr(config, "detector", None))
+
+    if detector_type == "exact":
+        return set(getattr(config, "values", {}).values())
+
+    if detector_type in ("gliner2", "spacy", "transformers", "llm"):
+        labels = getattr(config, "labels", None)
+        if labels is None:
+            return set()
+        if isinstance(labels, dict):
+            return set(labels.keys())
+        return set(labels)
+
+    return set()
 
 
 def _detection_schema(detection: Detection) -> DetectionSchema:
@@ -246,7 +302,12 @@ def create_app(config_path: Path) -> Litestar:
 
     @get("/v1/labels", exclude_from_auth=True)
     async def labels() -> LabelsResponse:
-        return LabelsResponse(name=config.name, detector=detector_type)
+        vocabulary = sorted(_detector_labels(config.detector))
+        return LabelsResponse(
+            name=config.name,
+            detector=detector_type,
+            labels=vocabulary,
+        )
 
     @post("/v1/detect")
     async def detect(data: DetectRequest) -> DetectResponse:

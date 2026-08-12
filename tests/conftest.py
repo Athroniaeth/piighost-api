@@ -78,6 +78,10 @@ def mock_config() -> MagicMock:
     config = MagicMock()
     config.name = "test"
     config.detector.type = "regex"
+    # The /v1/labels route derives its vocabulary from the detector config, so
+    # give the regex mock a real pattern set and no catalogs.
+    config.detector.patterns = {"EMAIL": "x", "PHONE": "y"}
+    config.detector.catalogs = []
     return config
 
 
