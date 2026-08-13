@@ -1,135 +1,80 @@
-"""Observation backend resolution for piighost-api.
+"""OpenTelemetry observation setup for piighost-api.
 
-Reads environment variables to decide which piighost observation backend
-to instantiate (Langfuse, Opik, …). The loader exposes three layers:
+piighost v2 is OpenTelemetry-native: the pipeline emits per-stage spans through
+``piighost.observation.get_tracer()``, which resolves the globally configured
+OpenTelemetry tracer. Observation is therefore a deployment concern, driven by
+the standard ``OTEL_*`` environment variables, and any OTLP-compatible backend
+(Langfuse, Opik, Phoenix, Jaeger, ...) can receive the traces.
 
-* :func:`detect_observation_backend` — pure env-var inspection that
-  returns an :class:`ObservationBackend` enum value.
-* :func:`create_observation_service` — factory that maps an enum value
-  to a concrete ``AbstractObservationService`` (or ``None``).
-* :func:`load_observation_service` — convenience wrapper composing the
-  two for use at app startup.
-
-If two or more backend "switch" env vars are set simultaneously, the
-loader raises :class:`MultipleObservationBackendsError` so the server
-fails fast at boot rather than silently picking one.
+``configure_observation`` wires an OTLP span exporter into the global tracer
+provider when an endpoint is configured, so the server exports piighost's spans
+out of the box. When no endpoint is set it is a no-op and the spans stay
+in-process.
 """
 
-from __future__ import annotations
-
+import logging
 import os
-from enum import Enum
 
-from piighost.observation import AbstractObservationService
+logger = logging.getLogger(__name__)
 
-
-class ObservationBackend(str, Enum):
-    """Identifier for the observation backend in use."""
-
-    NONE = "none"
-    LANGFUSE = "langfuse"
-    OPIK = "opik"
-    PHOENIX = "phoenix"
+# The standard OpenTelemetry variables that opt export in. The traces-specific
+# one wins over the generic one, matching the OTel SDK's own precedence.
+_OTLP_ENDPOINT_VARS = (
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+)
 
 
-class MultipleObservationBackendsError(RuntimeError):
-    """Raised when more than one observation backend is configured."""
+def otlp_endpoint() -> str | None:
+    """Return the configured OTLP traces endpoint, or None when unset."""
+    for var in _OTLP_ENDPOINT_VARS:
+        value = os.getenv(var)
+        if value:
+            return value
+    return None
 
 
-_BACKEND_ENV_SWITCHES: dict[ObservationBackend, str] = {
-    ObservationBackend.LANGFUSE: "LANGFUSE_PUBLIC_KEY",
-    ObservationBackend.OPIK: "OPIK_API_KEY",
-}
+def configure_observation() -> bool:
+    """Install an OTLP span exporter on the global tracer provider.
 
-
-def detect_observation_backend() -> ObservationBackend:
-    """Resolve the observation backend from environment variables.
-
-    Each backend has a "switch" env var (the SDK's own primary credential
-    variable) whose presence opts the backend in. Exactly one switch may
-    be set at a time.
+    Reads the standard OTEL_* environment variables. When an OTLP endpoint is
+    configured it builds an OpenTelemetry TracerProvider with a batching OTLP
+    exporter and registers it globally, so piighost's per-stage spans are
+    exported to the configured backend.
 
     Returns:
-        The matching :class:`ObservationBackend`, or
-        :attr:`ObservationBackend.NONE` if no switch is set.
+        True when export was configured, False when it stayed a no-op because no
+        OTLP endpoint is set.
 
     Raises:
-        MultipleObservationBackendsError: When two or more switches are
-            set, since piighost only accepts a single observation
-            service per pipeline.
+        ImportError: When an endpoint is set but the OpenTelemetry SDK is not
+            installed (install the piighost-api[observation] extra).
     """
-    detected = [
-        backend
-        for backend, env_var in _BACKEND_ENV_SWITCHES.items()
-        if os.getenv(env_var)
-    ]
+    endpoint = otlp_endpoint()
+    if endpoint is None:
+        return False
 
-    if len(detected) > 1:
-        names = ", ".join(b.value for b in detected)
-        raise MultipleObservationBackendsError(
-            f"Multiple observation backends configured ({names}); "
-            f"set environment variables for only one of: "
-            f"{', '.join(_BACKEND_ENV_SWITCHES.values())}."
+    try:
+        from opentelemetry import trace
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
         )
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    except ImportError as exc:
+        raise ImportError(
+            "Observation export requires the OpenTelemetry SDK. "
+            "Install it with: pip install piighost-api[observation]"
+        ) from exc
 
-    if not detected:
-        return ObservationBackend.NONE
+    service_name = os.getenv("OTEL_SERVICE_NAME", "piighost-api")
+    resource = Resource.create({"service.name": service_name})
+    provider = TracerProvider(resource=resource)
+    # OTLPSpanExporter reads the endpoint and headers from the OTEL_* env vars.
+    exporter = OTLPSpanExporter()
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
 
-    return detected[0]
-
-
-def create_observation_service(
-    backend: ObservationBackend,
-) -> AbstractObservationService | None:
-    """Instantiate the concrete service matching *backend*.
-
-    Args:
-        backend: Backend identifier returned by
-            :func:`detect_observation_backend`.
-
-    Returns:
-        A live ``AbstractObservationService`` instance, or ``None`` when
-        *backend* is :attr:`ObservationBackend.NONE` (the pipeline keeps
-        its default ``NoOpObservationService``).
-
-    Raises:
-        ImportError: When the chosen backend's SDK extra is not
-            installed (the piighost adapter raises this with an
-            explicit ``piighost[<backend>]`` install hint).
-        NotImplementedError: When *backend* identifies a service that
-            piighost does not yet provide (e.g. Phoenix).
-    """
-    if backend is ObservationBackend.NONE:
-        return None
-
-    if backend is ObservationBackend.LANGFUSE:
-        # Import the piighost adapter first so its top-level ``find_spec``
-        # check raises a helpful ``install piighost[langfuse]`` message
-        # before Python's own ``ModuleNotFoundError`` on ``langfuse``.
-        from piighost.observation.langfuse import LangfuseObservationService
-        from langfuse import Langfuse  # pyrefly: ignore[missing-import]
-
-        return LangfuseObservationService(client=Langfuse())
-
-    if backend is ObservationBackend.OPIK:
-        from piighost.observation.opik import OpikObservationService
-        from opik import Opik  # pyrefly: ignore[missing-import]
-
-        return OpikObservationService(client=Opik())
-
-    if backend is ObservationBackend.PHOENIX:
-        raise NotImplementedError(
-            "Phoenix observation backend is not yet implemented in piighost."
-        )
-
-    raise ValueError(f"Unknown observation backend: {backend!r}")
-
-
-def load_observation_service() -> AbstractObservationService | None:
-    """Detect and instantiate the observation backend from environment.
-
-    Convenience wrapper that calls :func:`detect_observation_backend`
-    and feeds the result into :func:`create_observation_service`.
-    """
-    backend = detect_observation_backend()
-    return create_observation_service(backend)
+    logger.info("OpenTelemetry span export enabled -> %s", endpoint)
+    return True
