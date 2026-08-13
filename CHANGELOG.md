@@ -1,4 +1,4 @@
-## 1.0.0 (unreleased)
+## 1.0.0 (2026-08-13)
 
 Migrate the server to piighost 1.0 (the v2 rewrite). The routes now serve the
 exact contract the piighost ``PIIGhostClient`` calls, so a remote pipeline drives
