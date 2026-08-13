@@ -4,6 +4,7 @@
 [![Tested with pytest](https://img.shields.io/badge/tests-pytest-informational.svg)](https://pytest.org/)
 [![Deps: uv](https://img.shields.io/badge/deps-managed%20with%20uv-3E4DD8.svg)](https://docs.astral.sh/uv/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-4B32C3.svg)](https://docs.astral.sh/ruff/)
+[![Discord](https://img.shields.io/badge/Discord-rejoindre-5865F2?logo=discord&logoColor=white)](https://discord.gg/vFg9GHQR2s)
 
 [README EN](README.md) - [README FR](README.fr.md)
 
@@ -57,6 +58,10 @@ docker pull ghcr.io/athroniaeth/piighost-api:latest
 - [Démarrage rapide](https://athroniaeth.github.io/piighost-api/fr/getting-started/quickstart/)
 - [Endpoints REST](https://athroniaeth.github.io/piighost-api/fr/reference/endpoints/)
 - [CLI](https://athroniaeth.github.io/piighost-api/fr/reference/cli/)
+
+## Communauté
+
+Rejoignez le [Discord](https://discord.gg/vFg9GHQR2s) pour obtenir de l'aide, signaler des bugs, proposer des fonctionnalités et échanger sur la dé-identification.
 
 ## Licence
 

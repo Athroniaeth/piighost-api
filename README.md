@@ -4,6 +4,7 @@
 [![Tested with pytest](https://img.shields.io/badge/tests-pytest-informational.svg)](https://pytest.org/)
 [![Deps: uv](https://img.shields.io/badge/deps-managed%20with%20uv-3E4DD8.svg)](https://docs.astral.sh/uv/)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-4B32C3.svg)](https://docs.astral.sh/ruff/)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/vFg9GHQR2s)
 
 [README EN](README.md) - [README FR](README.fr.md)
 
@@ -82,6 +83,10 @@ For a bare-local run without Redis, point the server at a `pipeline.toml` that o
 - [Quickstart](https://athroniaeth.github.io/piighost-api/getting-started/quickstart/)
 - [REST endpoints](https://athroniaeth.github.io/piighost-api/reference/endpoints/)
 - [CLI](https://athroniaeth.github.io/piighost-api/reference/cli/)
+
+## Community
+
+Join the [Discord](https://discord.gg/vFg9GHQR2s) to get help, report bugs, request features, and discuss de-identification.
 
 ## License
 
