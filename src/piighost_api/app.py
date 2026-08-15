@@ -117,6 +117,10 @@ class ForgetResponse(msgspec.Struct):
     detections: int
 
 
+class ThreadTokensResponse(msgspec.Struct):
+    tokens: dict[str, str]
+
+
 class IndexResponse(msgspec.Struct):
     name: str
     version: str
@@ -365,6 +369,18 @@ def create_app(config_path: Path) -> Litestar:
             detections=forgotten.detections,
         )
 
+    @get("/v1/threads/{thread_id:str}/tokens")
+    async def thread_tokens(thread_id: str) -> ThreadTokensResponse:
+        """Return the thread's placeholder-to-value map for streaming restoration.
+
+        Backed by ThreadAnonymizationPipeline.thread_token_map: it reads the cache
+        and exposes each token with the value it restores to, so a client resolves
+        a whole stream once instead of deanonymizing token by token. Auth-gated
+        like the other thread routes, since it discloses the thread's real values.
+        """
+        token_map = await pipeline.thread_token_map(thread_id)
+        return ThreadTokensResponse(tokens=token_map)
+
     max_body = int(os.getenv("PIIGHOST_MAX_BODY_BYTES", "1000000"))
 
     middleware = []
@@ -417,6 +433,7 @@ def create_app(config_path: Path) -> Litestar:
             anonymize_corrected,
             deanonymize,
             forget_thread,
+            thread_tokens,
         ],
         guards=[create_auth_guard(auth_state)],
         lifespan=[lifespan],

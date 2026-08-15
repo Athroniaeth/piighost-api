@@ -61,6 +61,9 @@ def mock_pipeline() -> MagicMock:
     )
     pipeline.deanonymize = AsyncMock(return_value="Patrick habite à Paris")
     pipeline.forget_thread = AsyncMock(return_value=Forgotten(messages=2, detections=3))
+    pipeline.thread_token_map = AsyncMock(
+        return_value={"<<PERSON:1>>": "Patrick", "<<LOCATION:1>>": "Paris"}
+    )
 
     pipeline.detector = MagicMock()
     pipeline.detector.detect = AsyncMock(

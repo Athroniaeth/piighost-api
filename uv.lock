@@ -940,14 +940,14 @@ wheels = [
 
 [[package]]
 name = "piighost"
-version = "1.0.0"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/87/02/dde4b07efc7fee65fc3a2778f1eb786984519511799635cb31a3160c5add/piighost-1.0.0.tar.gz", hash = "sha256:8627b16242b6cf4b908a9249b5986ff8a678349f63864ad2c0569e275b44f5f9", size = 2938805, upload-time = "2026-08-12T19:12:31.733Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/48/58/a97b5e156d6f2f3fc885d58b76bcb5d3e9edb63ccf27a256bc3524b69807/piighost-1.1.0.tar.gz", hash = "sha256:8812a7b098ae9fd7a784b6af885f59c7c19526e0a1c525f784d40bcb44e928d5", size = 2981275, upload-time = "2026-08-15T17:47:37.993Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/0a/eba5da4d71fa3473306395990f52f25533d1dec8c4d4de9382801ce93b1c/piighost-1.0.0-py3-none-any.whl", hash = "sha256:a657c3f96ec08acb1d01447a266886984ec3637d88f0beb1f54d19d336ea2782", size = 119844, upload-time = "2026-08-12T19:12:29.852Z" },
+    { url = "https://files.pythonhosted.org/packages/56/cc/fd62432f6e2ee69f5128509b524466f2edf80ef8ee4efe63dfef91c27ffb/piighost-1.1.0-py3-none-any.whl", hash = "sha256:adc2a45779679c8a35f2c8a19c3908c6ef5ad2e66a6a9f6ae64e023512905422", size = 125367, upload-time = "2026-08-15T17:47:36.879Z" },
 ]
 
 [package.optional-dependencies]
@@ -1006,7 +1006,7 @@ requires-dist = [
     { name = "msgspec", specifier = ">=0.19" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'observation'", specifier = ">=1.30" },
     { name = "opentelemetry-sdk", marker = "extra == 'observation'", specifier = ">=1.30" },
-    { name = "piighost", extras = ["config", "redis"], specifier = ">=1.0" },
+    { name = "piighost", extras = ["config", "redis"], specifier = ">=1.1" },
     { name = "piighost", extras = ["observation"], marker = "extra == 'observation'" },
     { name = "python-dotenv", marker = "extra == 'dataset'", specifier = ">=1.0" },
     { name = "requests", specifier = ">=2.32" },

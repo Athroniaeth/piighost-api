@@ -174,6 +174,22 @@ def test_forget_thread_returns_counts(
 
 
 # ------------------------------------------------------------------
+# GET /v1/threads/{thread_id}/tokens
+# ------------------------------------------------------------------
+
+
+def test_thread_tokens_returns_the_map(
+    client: TestClient, mock_pipeline: MagicMock
+) -> None:
+    response = client.get("/v1/threads/t1/tokens")
+    assert response.status_code == 200
+    assert response.json() == {
+        "tokens": {"<<PERSON:1>>": "Patrick", "<<LOCATION:1>>": "Paris"}
+    }
+    mock_pipeline.thread_token_map.assert_awaited_once_with("t1")
+
+
+# ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 
