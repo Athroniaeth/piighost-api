@@ -1,3 +1,9 @@
+## 1.1.0 (2026-08-15)
+
+### Feat
+
+- **threads**: expose GET /v1/threads/{thread_id}/tokens
+
 ## 1.0.0 (2026-08-13)
 
 Migrate the server to piighost 1.0 (the v2 rewrite). The routes now serve the
