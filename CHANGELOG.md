@@ -1,3 +1,19 @@
+## 1.2.0 (2026-08-21)
+
+### Feat
+
+- **proxy**: mount the /openai router in the app
+- **proxy**: completions, embeddings, moderations routes
+- **proxy**: chat/completions streaming with token reassembly
+- **proxy**: chat/completions non-streaming with ephemeral threading
+- **proxy**: router scaffold and pure-relay passthrough
+- **proxy**: body anonymize/deanonymize rewrite core
+- **proxy**: upstream helpers and httpx/respx deps
+
+### Fix
+
+- **proxy**: anonymize the legacy completions suffix field
+
 ## 1.1.0 (2026-08-15)
 
 ### Feat
