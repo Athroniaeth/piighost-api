@@ -21,6 +21,7 @@ nav = [
     { "CLI" = "reference/cli.md" },
     { "Migration" = "migration.md" },
   ]},
+  { "Proxy OpenAI" = "openai-proxy.md" },
 ]
 
 [project.theme]

@@ -52,12 +52,17 @@ Pour le chemin Docker :
 docker pull ghcr.io/athroniaeth/piighost-api:latest
 ```
 
+## Proxy compatible OpenAI
+
+`piighost-api` peut se comporter comme un proxy transparent compatible OpenAI sous `/openai/v1`. Pointez le `base_url` de votre client OpenAI vers le proxy et réglez le header `X-PIIGhost-Upstream` sur le vrai endpoint (par exemple `https://api.openai.com/v1`). Le proxy anonymise chaque requête, la relaie, et désanonymise la réponse, le fournisseur upstream ne voit donc jamais que des jetons comme `<<PERSON:1>>`. Voir le [guide du proxy OpenAI](https://athroniaeth.github.io/piighost-api/fr/openai-proxy/) pour les headers, les routes et les limites.
+
 ## Documentation
 
 - [Installation](https://athroniaeth.github.io/piighost-api/fr/getting-started/installation/)
 - [Démarrage rapide](https://athroniaeth.github.io/piighost-api/fr/getting-started/quickstart/)
 - [Endpoints REST](https://athroniaeth.github.io/piighost-api/fr/reference/endpoints/)
 - [CLI](https://athroniaeth.github.io/piighost-api/fr/reference/cli/)
+- [Proxy OpenAI](https://athroniaeth.github.io/piighost-api/fr/openai-proxy/)
 
 ## Communauté
 

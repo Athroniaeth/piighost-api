@@ -2,7 +2,9 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
+import respx
 from litestar.testing import TestClient
 
 from piighost.conversation_memory import MessageRole
@@ -305,3 +307,28 @@ def test_malformed_rate_limit_raises_clear_error(
 
             with pytest.raises(ValueError, match="PIIGHOST_RATE_LIMIT"):
                 create_app(FIXTURES / "minimal.toml")
+
+
+# ------------------------------------------------------------------
+# OpenAI proxy mount
+# ------------------------------------------------------------------
+
+
+@respx.mock
+def test_openai_proxy_is_mounted(client) -> None:
+    """The mounted /openai proxy relays chat/completions through the app."""
+    respx.post("https://up.example/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200, json={"choices": [{"message": {"content": "hi"}}]}
+        )
+    )
+    response = client.post(
+        "/openai/v1/chat/completions",
+        headers={
+            "x-piighost-upstream": "https://up.example/v1",
+            "authorization": "Bearer x",
+            "content-type": "application/json",
+        },
+        json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert response.status_code == 200

@@ -77,12 +77,17 @@ With this config, `REDIS_URL` must be set. docker-compose provides it; without i
 
 For a bare-local run without Redis, point the server at a `pipeline.toml` that omits the `[cache]` section. The pipeline then uses the in-process memory cache. This is single-worker only: the mapping is not shared, so multiple workers would assign inconsistent placeholders for the same `thread_id`.
 
+## OpenAI-compatible proxy
+
+`piighost-api` can act as a transparent OpenAI-compatible proxy under `/openai/v1`. Point your OpenAI client's `base_url` at the proxy and set the `X-PIIGhost-Upstream` header to the real endpoint (for example `https://api.openai.com/v1`). The proxy anonymizes every request, forwards it, and deanonymizes the reply, so the upstream provider only ever sees tokens like `<<PERSON:1>>`. See the [OpenAI proxy guide](https://athroniaeth.github.io/piighost-api/openai-proxy/) for headers, routes, and limitations.
+
 ## Documentation
 
 - [Installation](https://athroniaeth.github.io/piighost-api/getting-started/installation/)
 - [Quickstart](https://athroniaeth.github.io/piighost-api/getting-started/quickstart/)
 - [REST endpoints](https://athroniaeth.github.io/piighost-api/reference/endpoints/)
 - [CLI](https://athroniaeth.github.io/piighost-api/reference/cli/)
+- [OpenAI proxy](https://athroniaeth.github.io/piighost-api/openai-proxy/)
 
 ## Community
 
