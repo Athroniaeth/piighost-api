@@ -139,11 +139,11 @@ async def anonymize_input_field(
 async def anonymize_prompt_field(
     body: dict[str, Any], pipeline: ThreadAnonymizationPipeline, thread_id: str
 ) -> dict[str, Any]:
-    """Anonymize the `prompt` field (string or list) for legacy completions."""
-    if "prompt" in body:
-        body["prompt"] = await _map_strings(
-            body["prompt"], _anonymizer(pipeline, thread_id)
-        )
+    """Anonymize the `prompt` and `suffix` fields for legacy completions."""
+    op = _anonymizer(pipeline, thread_id)
+    for field in ("prompt", "suffix"):
+        if field in body:
+            body[field] = await _map_strings(body[field], op)
     return body
 
 

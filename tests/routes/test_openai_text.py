@@ -60,6 +60,24 @@ def test_completions_anonymizes_prompt_and_restores_text(client: TestClient) -> 
     assert response.json()["choices"][0]["text"] == "Patrick ok"
 
 
+@respx.mock
+def test_completions_anonymizes_the_suffix_field(client: TestClient) -> None:
+    """The fill-in-the-middle `suffix` field is anonymized too, not just the prompt."""
+    route = respx.post("https://up.example/v1/completions").mock(
+        return_value=httpx.Response(200, json={"choices": [{"text": "ok"}]})
+    )
+    client.post(
+        "/openai/v1/completions",
+        headers=_headers(),
+        json={
+            "model": "gpt-3.5-turbo-instruct",
+            "prompt": "hi",
+            "suffix": "from Patrick",
+        },
+    )
+    assert "Patrick" not in route.calls.last.request.content.decode()
+
+
 def test_non_object_body_is_400(client: TestClient) -> None:
     """A valid-JSON but non-object body is a 400, not a 500."""
     response = client.post("/openai/v1/embeddings", headers=_headers(), json=[1, 2, 3])
