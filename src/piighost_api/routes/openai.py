@@ -7,12 +7,16 @@ multimodal routes are byte passthroughs. The caller's Authorization is forwarded
 to the upstream, so these routes carry exclude_from_auth.
 """
 
+import json
 import uuid
+from collections.abc import AsyncIterator
 
 import httpx
 from litestar import Request, Response, Router, get, post
 from litestar.exceptions import HTTPException
+from litestar.response import Stream
 
+from piighost.components.placeholder import AsyncPlaceholderStreamDecoder
 from piighost.pipeline import ThreadAnonymizationPipeline
 
 from piighost_api.routes._rewrite import (
@@ -78,6 +82,56 @@ async def _forward_json(
         raise HTTPException(status_code=502, detail=f"Upstream request failed: {exc}")
 
 
+async def _restore_sse_chunk(raw: str, decoder: AsyncPlaceholderStreamDecoder) -> str:
+    """Restore tokens in an SSE data line's delta content; pass other lines through."""
+    if not raw.startswith("data:"):
+        return raw
+    payload = raw[len("data:") :].strip()
+    if payload == "[DONE]" or not payload:
+        return raw
+    try:
+        event = json.loads(payload)
+    except ValueError:
+        return raw
+    for choice in event.get("choices") or []:
+        delta = choice.get("delta") if isinstance(choice, dict) else None
+        if isinstance(delta, dict) and isinstance(delta.get("content"), str):
+            delta["content"] = await decoder.feed(delta["content"])
+    return "data: " + json.dumps(event)
+
+
+def _stream_upstream(
+    base: str,
+    headers: dict[str, str],
+    body: dict,
+    pipeline: ThreadAnonymizationPipeline,
+    thread_id: str,
+    ephemeral: bool,
+) -> AsyncIterator[bytes]:
+    """Yield restored SSE bytes from the upstream stream, then forget if ephemeral."""
+
+    async def replace(token: str) -> str:
+        return await pipeline.deanonymize(token, thread_id)
+
+    async def generator() -> AsyncIterator[bytes]:
+        decoder = AsyncPlaceholderStreamDecoder(replace)
+        try:
+            async with _client.stream(
+                "POST", f"{base}/chat/completions", headers=headers, json=body
+            ) as upstream:
+                async for line in upstream.aiter_lines():
+                    restored = await _restore_sse_chunk(line, decoder)
+                    yield (restored + "\n").encode()
+            trailing = decoder.flush()
+            if trailing:
+                yield trailing.encode()
+        finally:
+            if ephemeral:
+                await pipeline.forget_thread(thread_id)
+
+    return generator()
+
+
 def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
     """Build the /openai/v1 router over the given pipeline."""
 
@@ -95,12 +149,13 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
             )
         thread_id, ephemeral = _resolve_thread(request)
         try:
-            if body.get("stream"):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Streaming is handled by the streaming path.",
-                )
             await anonymize_chat_request(body, pipeline, thread_id)
+            if body.get("stream"):
+                stream = _stream_upstream(
+                    base, headers, body, pipeline, thread_id, ephemeral
+                )
+                ephemeral = False  # the generator owns the forget now
+                return Stream(stream, media_type="text/event-stream")
             upstream = await _forward_json(base, "chat/completions", headers, body)
             content_type = upstream.headers.get("content-type", "")
             if (
