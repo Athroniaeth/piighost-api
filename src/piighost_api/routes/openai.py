@@ -9,7 +9,7 @@ to the upstream, so these routes carry exclude_from_auth.
 
 import json
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import httpx
 from litestar import Request, Response, Router, get, post
@@ -21,7 +21,10 @@ from piighost.pipeline import ThreadAnonymizationPipeline
 
 from piighost_api.routes._rewrite import (
     anonymize_chat_request,
+    anonymize_input_field,
+    anonymize_prompt_field,
     deanonymize_chat_response,
+    deanonymize_completion_response,
 )
 from piighost_api.routes._upstream import forward_headers, upstream_base_url
 
@@ -132,6 +135,44 @@ def _stream_upstream(
     return generator()
 
 
+async def _proxy_json(
+    request: Request,
+    subpath: str,
+    pipeline: ThreadAnonymizationPipeline,
+    anonymize: Callable[..., Awaitable[dict]],
+    deanonymize: Callable[..., Awaitable[dict]] | None,
+) -> Response:
+    """Anonymize a JSON body, forward it, and optionally deanonymize the reply."""
+    base = upstream_base_url(request.headers)
+    headers = forward_headers(request.headers)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be JSON.")
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=400, detail="Request body must be a JSON object."
+        )
+    thread_id, ephemeral = _resolve_thread(request)
+    try:
+        await anonymize(body, pipeline, thread_id)
+        upstream = await _forward_json(base, subpath, headers, body)
+        content_type = upstream.headers.get("content-type", "")
+        if content_type.startswith("application/json") and upstream.status_code < 400:
+            payload = upstream.json()
+            if deanonymize is not None:
+                await deanonymize(payload, pipeline, thread_id)
+            return Response(content=payload, status_code=upstream.status_code)
+        return Response(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type"),
+        )
+    finally:
+        if ephemeral:
+            await pipeline.forget_thread(thread_id)
+
+
 def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
     """Build the /openai/v1 router over the given pipeline."""
 
@@ -192,7 +233,36 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
     async def multimodal(request: Request) -> Response:
         return await _relay_raw(request, _subpath(request))
 
+    @post("/completions", exclude_from_auth=True)
+    async def completions(request: Request) -> Response:
+        return await _proxy_json(
+            request,
+            "completions",
+            pipeline,
+            anonymize_prompt_field,
+            deanonymize_completion_response,
+        )
+
+    @post("/embeddings", exclude_from_auth=True)
+    async def embeddings(request: Request) -> Response:
+        return await _proxy_json(
+            request, "embeddings", pipeline, anonymize_input_field, None
+        )
+
+    @post("/moderations", exclude_from_auth=True)
+    async def moderations(request: Request) -> Response:
+        return await _proxy_json(
+            request, "moderations", pipeline, anonymize_input_field, None
+        )
+
     return Router(
         path="/openai/v1",
-        route_handlers=[chat_completions, models, multimodal],
+        route_handlers=[
+            chat_completions,
+            models,
+            multimodal,
+            completions,
+            embeddings,
+            moderations,
+        ],
     )
