@@ -38,6 +38,7 @@ from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import AuthState, create_auth_guard
 from piighost_api.observation import configure_observation
+from piighost_api.routes.openai import build_openai_router
 
 logger = logging.getLogger(__name__)
 
@@ -244,6 +245,7 @@ def create_app(config_path: Path) -> Litestar:
     config = load_config(config_path)
     pipeline: ThreadAnonymizationPipeline = load_thread_pipeline(config_path)
     detector_type = config.detector.type
+    openai_router = build_openai_router(pipeline)
 
     if configure_observation():
         logger.info("Observation export enabled")
@@ -434,6 +436,7 @@ def create_app(config_path: Path) -> Litestar:
             deanonymize,
             forget_thread,
             thread_tokens,
+            openai_router,
         ],
         guards=[create_auth_guard(auth_state)],
         lifespan=[lifespan],
