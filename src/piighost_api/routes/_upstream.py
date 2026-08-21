@@ -17,7 +17,7 @@ _FORWARDED = ("authorization", "content-type")
 class _HeaderMap(Protocol):
     """The subset of a headers mapping these helpers read."""
 
-    def get(self, key: str, default: str | None = None) -> str | None: ...
+    def get(self, key: str, /) -> str | None: ...
 
 
 def upstream_base_url(headers: _HeaderMap) -> str:
