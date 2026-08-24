@@ -22,7 +22,7 @@ from piighost_api.routes._anthropic_shape import (
     deanonymize_anthropic_response,
 )
 from piighost_api.routes._relay import _client, forward_json, resolve_thread
-from piighost_api.routes._upstream import forward_headers, upstream_base_url
+from piighost_api.routes._upstream import forward_headers_permissive, upstream_base_url
 
 
 def _stream_upstream(
@@ -58,9 +58,16 @@ def _stream_upstream(
 
 
 def build_anthropic_router(
-    pipeline: ThreadAnonymizationPipeline, default_upstream: str | None = None
+    pipeline: ThreadAnonymizationPipeline,
+    default_upstream: str | None = None,
+    anonymize_system: bool = True,
 ) -> Router:
-    """Build the /anthropic/v1 router over the given pipeline and default upstream."""
+    """Build the /anthropic/v1 router over the given pipeline and default upstream.
+
+    When anonymize_system is False the system prompt is relayed untouched, for a
+    subscription-authenticated harness whose client fingerprint the upstream
+    validates; message content is anonymized regardless.
+    """
 
     async def _read_body(request: Request) -> dict:
         """Parse and validate the request body as a JSON object, raising 400 otherwise."""
@@ -78,11 +85,13 @@ def build_anthropic_router(
     async def messages(request: Request) -> Response:
         """Anonymize the request, relay it upstream, and deanonymize the reply."""
         base = upstream_base_url(request.headers, default_upstream)
-        headers = forward_headers(request.headers)
+        headers = forward_headers_permissive(request.headers)
         body = await _read_body(request)
         thread_id, ephemeral = resolve_thread(request)
         try:
-            await anonymize_anthropic_request(body, pipeline, thread_id)
+            await anonymize_anthropic_request(
+                body, pipeline, thread_id, anonymize_system
+            )
             if body.get("stream"):
                 stream = _stream_upstream(
                     base, headers, body, pipeline, thread_id, ephemeral
@@ -111,11 +120,13 @@ def build_anthropic_router(
     async def count_tokens(request: Request) -> Response:
         """Anonymize the request and relay it to the upstream count_tokens endpoint."""
         base = upstream_base_url(request.headers, default_upstream)
-        headers = forward_headers(request.headers)
+        headers = forward_headers_permissive(request.headers)
         body = await _read_body(request)
         thread_id, ephemeral = resolve_thread(request)
         try:
-            await anonymize_anthropic_request(body, pipeline, thread_id)
+            await anonymize_anthropic_request(
+                body, pipeline, thread_id, anonymize_system
+            )
             upstream = await forward_json(base, "messages/count_tokens", headers, body)
             return Response(
                 content=upstream.content,

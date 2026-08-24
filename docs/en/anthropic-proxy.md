@@ -66,11 +66,32 @@ Claude Code picks up `ANTHROPIC_BASE_URL` automatically and routes every call th
 - The upstream defaults to `https://api.anthropic.com/v1`. Override it per
   request with an `X-PIIGhost-Upstream` header, or globally with the
   `PIIGHOST_ANTHROPIC_UPSTREAM` environment variable, to target a gateway.
-- Prefer an API key over subscription OAuth. OAuth behaves poorly through a
-  custom base URL.
+- Every client header is relayed to the upstream except the hop-by-hop ones,
+  `host`, `content-length`, `accept-encoding`, and the `X-PIIGhost-*` control
+  headers. This keeps the caller's user-agent and beta flags intact for upstreams
+  that validate them.
 - Each request is a fresh ephemeral thread, matching how Claude Code resends the
   whole history every turn. Pass `X-PIIGhost-Thread-ID` only if you want a
   persistent thread you manage yourself.
+
+## Subscription (OAuth) mode
+
+The base-URL approach above is meant for API-key or gateway usage. A Pro or Max
+subscription authenticates with OAuth, and Claude Code hardcodes the real
+`api.anthropic.com` for its OAuth and refresh calls, so setting
+`ANTHROPIC_BASE_URL` does not route subscription traffic through the proxy: it
+either drops you out of subscription mode or fails. Anthropic also validates the
+client fingerprint of OAuth requests, so a modifying proxy is not a supported path
+for a subscription.
+
+Two knobs exist to give a subscription or fingerprint-sensitive gateway its best
+chance, without weakening the default:
+
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (default `true`): set it to `false` to
+  relay the system prompt untouched so the upstream can still validate the client.
+  Message and tool content are anonymized regardless.
+- Permissive header forwarding (always on for `/anthropic`) keeps the client's
+  user-agent and OAuth beta flags, which the upstream may require.
 
 ## Known limitations
 

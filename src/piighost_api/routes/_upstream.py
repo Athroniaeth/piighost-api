@@ -4,6 +4,7 @@ The upstream is chosen per request via the X-PIIGhost-Upstream header, and the
 caller's Authorization is forwarded to it, so the proxy is a transparent relay.
 """
 
+from collections.abc import Iterable
 from typing import Protocol
 
 from litestar.exceptions import HTTPException
@@ -21,11 +22,42 @@ _FORWARDED = (
 """Header names passed through to the upstream; covers both OpenAI (authorization)
 and Anthropic (x-api-key, anthropic-version, anthropic-beta) auth conventions."""
 
+_HOP_BY_HOP = frozenset(
+    {
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+    }
+)
+"""RFC 7230 hop-by-hop headers, which belong to a single transport hop only."""
+
+_DROPPED_PERMISSIVE = _HOP_BY_HOP | {
+    "host",
+    "content-length",
+    "accept-encoding",
+    UPSTREAM_HEADER,
+    THREAD_HEADER,
+}
+"""Headers the permissive forwarder never relays: hop-by-hop, the ones httpx must
+recompute for the rewritten body (host, content-length, accept-encoding), and the
+piighost control headers."""
+
 
 class _HeaderMap(Protocol):
     """The subset of a headers mapping these helpers read."""
 
     def get(self, key: str, /) -> str | None: ...
+
+
+class _HeaderItems(Protocol):
+    """A headers mapping the permissive forwarder can iterate over."""
+
+    def items(self) -> Iterable[tuple[str, str]]: ...
 
 
 def upstream_base_url(headers: _HeaderMap, default: str | None = None) -> str:
@@ -54,5 +86,19 @@ def forward_headers(headers: _HeaderMap) -> dict[str, str]:
     for name in _FORWARDED:
         value = headers.get(name)
         if value is not None:
+            forwarded[name] = value
+    return forwarded
+
+
+def forward_headers_permissive(headers: _HeaderItems) -> dict[str, str]:
+    """Relay every client header except hop-by-hop, recomputed, and piighost ones.
+
+    Unlike forward_headers, this keeps arbitrary client headers such as the
+    Claude Code user-agent and OAuth beta flags, which the Anthropic upstream may
+    require to validate the caller. Header names match case-insensitively.
+    """
+    forwarded: dict[str, str] = {}
+    for name, value in headers.items():
+        if name.lower() not in _DROPPED_PERMISSIVE:
             forwarded[name] = value
     return forwarded

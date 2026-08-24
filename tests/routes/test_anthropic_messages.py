@@ -287,3 +287,43 @@ def test_stream_restores_token_split_across_deltas(client: TestClient) -> None:
         received = b"".join(response.iter_bytes()).decode()
     assert "Patrick" in received
     assert "<<PERSON" not in received
+
+
+@respx.mock
+def test_system_preserved_when_disabled_and_headers_relayed() -> None:
+    """With anonymize_system=False the system stays intact while messages anonymize; OAuth headers relay."""
+    detector = ExactMatchDetector({"Patrick": "PERSON"})
+    pipeline = ThreadAnonymizationPipeline(detector)
+    router = build_anthropic_router(
+        pipeline, default_upstream=_DEFAULT, anonymize_system=False
+    )
+    app = Litestar(route_handlers=[router])
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"type": "message", "role": "assistant", "content": []}
+        )
+    )
+    with TestClient(app=app) as tc:
+        tc.post(
+            "/anthropic/v1/messages",
+            headers={
+                "authorization": "Bearer oauth",
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "oauth-2025-04-20",
+                "user-agent": "claude-cli/1.2.3",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-3-5-sonnet",
+                "max_tokens": 64,
+                "system": "You help Patrick.",
+                "messages": [{"role": "user", "content": "I am Patrick"}],
+            },
+        )
+    forwarded_body = route.calls.last.request.content.decode()
+    forwarded_headers = route.calls.last.request.headers
+    assert "You help Patrick." in forwarded_body
+    assert "I am Patrick" not in forwarded_body
+    assert "<<PERSON:1>>" in forwarded_body
+    assert forwarded_headers["user-agent"] == "claude-cli/1.2.3"
+    assert forwarded_headers["authorization"] == "Bearer oauth"

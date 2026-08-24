@@ -250,8 +250,13 @@ def create_app(config_path: Path) -> Litestar:
     anthropic_upstream = os.getenv(
         "PIIGHOST_ANTHROPIC_UPSTREAM", "https://api.anthropic.com/v1"
     )
+    anonymize_system = os.getenv(
+        "PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM", "true"
+    ).strip().lower() in ("1", "true", "yes", "on")
     openai_router = build_openai_router(pipeline, openai_upstream)
-    anthropic_router = build_anthropic_router(pipeline, anthropic_upstream)
+    anthropic_router = build_anthropic_router(
+        pipeline, anthropic_upstream, anonymize_system=anonymize_system
+    )
 
     if configure_observation():
         logger.info("Observation export enabled")

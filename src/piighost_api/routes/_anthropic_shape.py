@@ -67,11 +67,20 @@ async def _rewrite_messages(messages: Any, op: _StringOp) -> None:
 
 
 async def anonymize_anthropic_request(
-    body: dict[str, Any], pipeline: ThreadAnonymizationPipeline, thread_id: str
+    body: dict[str, Any],
+    pipeline: ThreadAnonymizationPipeline,
+    thread_id: str,
+    anonymize_system: bool = True,
 ) -> dict[str, Any]:
-    """Anonymize a Messages request body's system prompt and message content."""
+    """Anonymize a Messages request body's system prompt and message content.
+
+    When anonymize_system is False the system prompt is left untouched, which a
+    subscription-authenticated harness such as Claude Code needs so the upstream
+    can still validate its client fingerprint; message content is anonymized
+    either way.
+    """
     op = _anonymizer(pipeline, thread_id)
-    if "system" in body:
+    if anonymize_system and "system" in body:
         body["system"] = await _rewrite_system(body["system"], op)
     await _rewrite_messages(body.get("messages"), op)
     return body

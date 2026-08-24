@@ -214,3 +214,15 @@ async def test_restorer_flush_emits_trailing_fragment(pipeline) -> None:
     )
     await restorer.feed_line(line)
     assert restorer.flush() == "<<PER"
+
+
+async def test_anonymize_skips_system_when_disabled(pipeline) -> None:
+    """With anonymize_system=False, the system prompt is left intact, messages still anonymized."""
+    body = {
+        "system": "You help Patrick.",
+        "messages": [{"role": "user", "content": "I am Patrick"}],
+    }
+    await anonymize_anthropic_request(body, pipeline, "t1", anonymize_system=False)
+    assert body["system"] == "You help Patrick."
+    assert "Patrick" not in body["messages"][0]["content"]
+    assert "<<PERSON:1>>" in body["messages"][0]["content"]

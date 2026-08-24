@@ -3,7 +3,11 @@
 import pytest
 from litestar.exceptions import HTTPException
 
-from piighost_api.routes._upstream import forward_headers, upstream_base_url
+from piighost_api.routes._upstream import (
+    forward_headers,
+    forward_headers_permissive,
+    upstream_base_url,
+)
 
 
 class _Headers:
@@ -85,3 +89,35 @@ def test_forward_headers_relays_anthropic_headers() -> None:
     assert forwarded["anthropic-version"] == "2023-06-01"
     assert forwarded["anthropic-beta"] == "tools-2024"
     assert "x-piighost-upstream" not in forwarded
+
+
+def test_forward_headers_permissive_relays_unknown_drops_internal() -> None:
+    """Permissive forwarding relays arbitrary client headers, dropping hop-by-hop and piighost."""
+    headers = {
+        "authorization": "Bearer oauth",
+        "anthropic-beta": "oauth-2025-04-20",
+        "user-agent": "claude-cli/1.2.3",
+        "x-app": "cli",
+        "x-stainless-lang": "js",
+        "host": "localhost:8080",
+        "content-length": "123",
+        "accept-encoding": "gzip",
+        "connection": "keep-alive",
+        "x-piighost-upstream": "https://api.anthropic.com/v1",
+        "x-piighost-thread-id": "t1",
+    }
+    forwarded = forward_headers_permissive(headers)
+    assert forwarded["authorization"] == "Bearer oauth"
+    assert forwarded["anthropic-beta"] == "oauth-2025-04-20"
+    assert forwarded["user-agent"] == "claude-cli/1.2.3"
+    assert forwarded["x-app"] == "cli"
+    assert forwarded["x-stainless-lang"] == "js"
+    for dropped in (
+        "host",
+        "content-length",
+        "accept-encoding",
+        "connection",
+        "x-piighost-upstream",
+        "x-piighost-thread-id",
+    ):
+        assert dropped not in forwarded

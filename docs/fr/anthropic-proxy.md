@@ -65,11 +65,32 @@ Claude Code lit `ANTHROPIC_BASE_URL` automatiquement et route chaque appel via l
 - L'upstream par défaut est `https://api.anthropic.com/v1`. Surchargez-le par
   requête avec un header `X-PIIGhost-Upstream`, ou globalement avec la variable
   d'environnement `PIIGHOST_ANTHROPIC_UPSTREAM`, pour cibler une passerelle.
-- Préférez une clé d'API à l'OAuth par abonnement. L'OAuth se comporte mal via
-  une URL de base personnalisée.
+- Tous les headers de l'appelant sont relayés vers l'upstream, sauf les headers
+  hop-by-hop, `host`, `content-length`, `accept-encoding` et les headers de
+  contrôle `X-PIIGhost-*`. Cela préserve le user-agent et les flags beta de
+  l'appelant pour les upstreams qui les valident.
 - Chaque requête est un thread éphémère, ce qui correspond au comportement de
   Claude Code qui renvoie tout l'historique à chaque tour. Passez
   `X-PIIGhost-Thread-ID` uniquement si vous gérez vous-même un thread persistant.
+
+## Mode abonnement (OAuth)
+
+L'approche par URL de base ci-dessus vise l'usage par clé d'API ou passerelle. Un
+abonnement Pro ou Max s'authentifie en OAuth, et Claude Code code en dur le vrai
+`api.anthropic.com` pour ses appels OAuth et de rafraîchissement. Définir
+`ANTHROPIC_BASE_URL` ne fait donc pas passer le trafic d'abonnement par le proxy,
+cela vous sort du mode abonnement ou échoue. Anthropic valide aussi l'empreinte du
+client des requêtes OAuth, donc un proxy qui modifie les requêtes n'est pas un
+chemin pris en charge pour un abonnement.
+
+Deux réglages existent pour donner à un abonnement, ou à une passerelle sensible à
+l'empreinte, sa meilleure chance, sans affaiblir le défaut :
+
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (défaut `true`) : mettez-le à `false` pour
+  relayer le prompt système intact afin que l'upstream puisse encore valider le
+  client. Le contenu des messages et des outils reste anonymisé dans tous les cas.
+- Le forwarding permissif des headers (toujours actif sur `/anthropic`) conserve
+  le user-agent et les flags beta OAuth de l'appelant, que l'upstream peut exiger.
 
 ## Limites connues
 
