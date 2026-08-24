@@ -84,12 +84,13 @@ either drops you out of subscription mode or fails. Anthropic also validates the
 client fingerprint of OAuth requests, so a modifying proxy is not a supported path
 for a subscription.
 
-Two knobs exist to give a subscription or fingerprint-sensitive gateway its best
-chance, without weakening the default:
+Two knobs help a subscription or fingerprint-sensitive gateway, and the first is
+the default because a coding harness is the primary target:
 
-- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (default `true`): set it to `false` to
-  relay the system prompt untouched so the upstream can still validate the client.
-  Message and tool content are anonymized regardless.
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (default `false`): by default the system
+  prompt is relayed untouched so the upstream can still validate the client. Set
+  it to `true` to anonymize the system prompt as well. Message and tool content
+  are anonymized either way. If your system prompt can carry PII, set it to `true`.
 - Permissive header forwarding (always on for `/anthropic`) keeps the client's
   user-agent and OAuth beta flags, which the upstream may require.
 

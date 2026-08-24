@@ -83,12 +83,14 @@ cela vous sort du mode abonnement ou échoue. Anthropic valide aussi l'empreinte
 client des requêtes OAuth, donc un proxy qui modifie les requêtes n'est pas un
 chemin pris en charge pour un abonnement.
 
-Deux réglages existent pour donner à un abonnement, ou à une passerelle sensible à
-l'empreinte, sa meilleure chance, sans affaiblir le défaut :
+Deux réglages aident un abonnement, ou une passerelle sensible à l'empreinte, et
+le premier est le défaut car un harness de code est la cible principale :
 
-- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (défaut `true`) : mettez-le à `false` pour
-  relayer le prompt système intact afin que l'upstream puisse encore valider le
-  client. Le contenu des messages et des outils reste anonymisé dans tous les cas.
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (défaut `false`) : par défaut le prompt
+  système est relayé intact afin que l'upstream puisse encore valider le client.
+  Mettez-le à `true` pour anonymiser aussi le prompt système. Le contenu des
+  messages et des outils reste anonymisé dans tous les cas. Si votre prompt
+  système peut contenir des données personnelles, mettez-le à `true`.
 - Le forwarding permissif des headers (toujours actif sur `/anthropic`) conserve
   le user-agent et les flags beta OAuth de l'appelant, que l'upstream peut exiger.
 

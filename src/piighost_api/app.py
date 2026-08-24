@@ -251,7 +251,7 @@ def create_app(config_path: Path) -> Litestar:
         "PIIGHOST_ANTHROPIC_UPSTREAM", "https://api.anthropic.com/v1"
     )
     anonymize_system = os.getenv(
-        "PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM", "true"
+        "PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM", "false"
     ).strip().lower() in ("1", "true", "yes", "on")
     openai_router = build_openai_router(pipeline, openai_upstream)
     anthropic_router = build_anthropic_router(
