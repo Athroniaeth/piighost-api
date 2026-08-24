@@ -45,3 +45,43 @@ def test_forward_headers_keeps_auth_and_content_type_only() -> None:
         "authorization": "Bearer sk-test",
         "content-type": "application/json",
     }
+
+
+def test_upstream_default_used_when_header_absent() -> None:
+    """With no X-PIIGhost-Upstream header, the configured default is returned."""
+    headers = {"authorization": "Bearer x"}
+    assert (
+        upstream_base_url(headers, default="https://api.anthropic.com/v1")
+        == "https://api.anthropic.com/v1"
+    )
+
+
+def test_upstream_header_wins_over_default() -> None:
+    """A present header overrides the configured default."""
+    headers = {"x-piighost-upstream": "https://custom/v1"}
+    assert (
+        upstream_base_url(headers, default="https://api.anthropic.com/v1")
+        == "https://custom/v1"
+    )
+
+
+def test_upstream_no_header_no_default_is_400() -> None:
+    """With neither a header nor a default, resolution is a 400."""
+    with pytest.raises(HTTPException) as exc:
+        upstream_base_url({}, default=None)
+    assert exc.value.status_code == 400
+
+
+def test_forward_headers_relays_anthropic_headers() -> None:
+    """Anthropic auth and version headers are forwarded when present."""
+    headers = {
+        "x-api-key": "sk-ant",
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "tools-2024",
+        "x-piighost-upstream": "https://custom/v1",
+    }
+    forwarded = forward_headers(headers)
+    assert forwarded["x-api-key"] == "sk-ant"
+    assert forwarded["anthropic-version"] == "2023-06-01"
+    assert forwarded["anthropic-beta"] == "tools-2024"
+    assert "x-piighost-upstream" not in forwarded

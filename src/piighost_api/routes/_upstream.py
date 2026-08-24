@@ -11,7 +11,15 @@ from litestar.exceptions import HTTPException
 UPSTREAM_HEADER = "x-piighost-upstream"
 THREAD_HEADER = "x-piighost-thread-id"
 
-_FORWARDED = ("authorization", "content-type")
+_FORWARDED = (
+    "authorization",
+    "content-type",
+    "x-api-key",
+    "anthropic-version",
+    "anthropic-beta",
+)
+"""Header names passed through to the upstream; covers both OpenAI (authorization)
+and Anthropic (x-api-key, anthropic-version, anthropic-beta) auth conventions."""
 
 
 class _HeaderMap(Protocol):
@@ -20,18 +28,24 @@ class _HeaderMap(Protocol):
     def get(self, key: str, /) -> str | None: ...
 
 
-def upstream_base_url(headers: _HeaderMap) -> str:
-    """Return the upstream base URL from the header, or raise 400 when absent."""
+def upstream_base_url(headers: _HeaderMap, default: str | None = None) -> str:
+    """Return the upstream base URL: the header if set, else the default.
+
+    Raises 400 only when neither a header nor a default is available.
+    """
     raw = headers.get(UPSTREAM_HEADER)
-    if not raw:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Missing {UPSTREAM_HEADER} header. Set it to an "
-                "OpenAI-compatible base URL, e.g. https://api.openai.com/v1."
-            ),
-        )
-    return raw.rstrip("/")
+    if raw:
+        return raw.rstrip("/")
+    if default:
+        return default.rstrip("/")
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"Missing {UPSTREAM_HEADER} header and no default upstream is "
+            "configured. Set it to a provider base URL, e.g. "
+            "https://api.openai.com/v1 or https://api.anthropic.com/v1."
+        ),
+    )
 
 
 def forward_headers(headers: _HeaderMap) -> dict[str, str]:
