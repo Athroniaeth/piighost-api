@@ -1,6 +1,7 @@
 """Unit tests for the Anthropic content-block walker and stream restorer."""
 
 import json
+from typing import Any
 
 import pytest
 
@@ -74,8 +75,8 @@ async def test_anonymize_tool_use_input_and_tool_result(pipeline) -> None:
         ]
     }
     await anonymize_anthropic_request(body, pipeline, "t1")
-    tool_use = body["messages"][0]["content"][0]
-    tool_result = body["messages"][1]["content"][0]
+    tool_use: Any = body["messages"][0]["content"][0]
+    tool_result: Any = body["messages"][1]["content"][0]
     assert tool_use["input"]["cmd"] == "echo <<PERSON:1>>"
     assert tool_result["content"] == "<<PERSON:1>> was here"
 
