@@ -85,10 +85,16 @@ Two text streams need restoring, handled differently:
   `AsyncPlaceholderStreamDecoder` keyed per content-block index. A token split across two
   deltas is reassembled then restored, and text is emitted as it goes for good UX.
 - `content_block_delta` / `input_json_delta.partial_json` (streamed tool-call arguments):
-  buffer `partial_json` per block index until `content_block_stop`, then deanonymize the
-  assembled JSON with JSON-safe escaping of the restored values, and re-emit. Tool arguments
-  are not streamed token by token, which avoids inserting an unescaped real value into a JSON
-  fragment. Tool arguments are not displayed live anyway.
+  handled inline exactly like `text_delta`, with its own per-index decoder. We restore the
+  decoded Python string value of `partial_json`, then re-serialize the event with
+  `json.dumps`, so JSON escaping of the restored value is automatic and no buffering to
+  `content_block_stop` is needed. A per-index decoder is required so a held token fragment
+  never bleeds from one content block into another.
+
+At stream end, every per-index decoder is flushed and any trailing fragment is emitted, as
+the OpenAI proxy does. On a well-formed stream those flushes are empty, since the model
+completes each token before its block closes; a fragment only appears on a truncated stream
+and carries no real value.
 
 All non-text events (`message_start`, `ping`, `message_delta`, usage) are relayed unchanged.
 
@@ -121,7 +127,7 @@ and a respx-mocked upstream:
 - `tool_result` content in a user message is anonymized on the way in.
 - `image` block is passed through untouched.
 - Streaming text with a token split across deltas is reassembled and restored.
-- Streaming `tool_use` arguments are buffered, restored, and JSON-safe.
+- Streaming `tool_use` arguments are restored inline and stay JSON-safe.
 - `count_tokens` request is anonymized.
 - Default upstream is used when no header is present; `X-PIIGhost-Upstream` overrides it.
 - Forwarded headers include `x-api-key` and `anthropic-version`; PIIGhost headers are
