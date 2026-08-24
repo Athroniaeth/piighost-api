@@ -5,7 +5,10 @@ import pytest
 from piighost.components.detector import ExactMatchDetector
 from piighost.pipeline import ThreadAnonymizationPipeline
 
-from piighost_api.routes._anthropic_shape import anonymize_anthropic_request
+from piighost_api.routes._anthropic_shape import (
+    anonymize_anthropic_request,
+    deanonymize_anthropic_response,
+)
 
 
 @pytest.fixture
@@ -91,3 +94,33 @@ async def test_tools_definitions_are_passthrough(pipeline) -> None:
     body = {"tools": tools, "messages": [{"role": "user", "content": "hi"}]}
     await anonymize_anthropic_request(body, pipeline, "t1")
     assert body["tools"] == tools
+
+
+async def _prime(pipeline: ThreadAnonymizationPipeline, thread_id: str) -> None:
+    """Anonymize 'Patrick' so <<PERSON:1>> maps back to it in the thread."""
+    await pipeline.anonymize("Patrick", thread_id)
+
+
+async def test_deanonymize_text_block(pipeline) -> None:
+    """A text block containing a placeholder is restored to its original value."""
+    await _prime(pipeline, "t1")
+    body = {"content": [{"type": "text", "text": "Hi <<PERSON:1>>"}]}
+    await deanonymize_anthropic_response(body, pipeline, "t1")
+    assert body["content"][0]["text"] == "Hi Patrick"
+
+
+async def test_deanonymize_tool_use_input(pipeline) -> None:
+    """A placeholder inside tool_use.input is restored to its original value."""
+    await _prime(pipeline, "t1")
+    body = {
+        "content": [
+            {
+                "type": "tool_use",
+                "id": "tu_1",
+                "name": "run",
+                "input": {"cmd": "echo <<PERSON:1>>"},
+            }
+        ]
+    }
+    await deanonymize_anthropic_response(body, pipeline, "t1")
+    assert body["content"][0]["input"]["cmd"] == "echo Patrick"
