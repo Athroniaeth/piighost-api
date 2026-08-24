@@ -105,6 +105,7 @@ def test_forward_headers_permissive_relays_unknown_drops_internal() -> None:
         "connection": "keep-alive",
         "x-piighost-upstream": "https://api.anthropic.com/v1",
         "x-piighost-thread-id": "t1",
+        "x-piighost-debug": "1",
     }
     forwarded = forward_headers_permissive(headers)
     assert forwarded["authorization"] == "Bearer oauth"
@@ -119,5 +120,7 @@ def test_forward_headers_permissive_relays_unknown_drops_internal() -> None:
         "connection",
         "x-piighost-upstream",
         "x-piighost-thread-id",
+        "x-piighost-debug",
     ):
         assert dropped not in forwarded
+    assert not any(name.lower().startswith("x-piighost-") for name in forwarded)

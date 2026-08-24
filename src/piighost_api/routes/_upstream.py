@@ -40,12 +40,13 @@ _DROPPED_PERMISSIVE = _HOP_BY_HOP | {
     "host",
     "content-length",
     "accept-encoding",
-    UPSTREAM_HEADER,
-    THREAD_HEADER,
 }
-"""Headers the permissive forwarder never relays: hop-by-hop, the ones httpx must
-recompute for the rewritten body (host, content-length, accept-encoding), and the
-piighost control headers."""
+"""Headers the permissive forwarder never relays: hop-by-hop, plus the ones httpx
+must recompute for the rewritten body (host, content-length, accept-encoding).
+Every piighost control header is dropped by prefix, see _PIIGHOST_PREFIX."""
+
+_PIIGHOST_PREFIX = "x-piighost-"
+"""Any header under this prefix is internal control and must not reach the upstream."""
 
 
 class _HeaderMap(Protocol):
@@ -99,6 +100,8 @@ def forward_headers_permissive(headers: _HeaderItems) -> dict[str, str]:
     """
     forwarded: dict[str, str] = {}
     for name, value in headers.items():
-        if name.lower() not in _DROPPED_PERMISSIVE:
-            forwarded[name] = value
+        lowered = name.lower()
+        if lowered in _DROPPED_PERMISSIVE or lowered.startswith(_PIIGHOST_PREFIX):
+            continue
+        forwarded[name] = value
     return forwarded
