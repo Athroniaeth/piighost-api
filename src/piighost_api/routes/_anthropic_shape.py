@@ -7,9 +7,11 @@ Anthropic schema evolving. All rewriting goes through the pipeline's public
 anonymize and deanonymize, over a single thread per request.
 """
 
+import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from piighost.components.placeholder import AsyncPlaceholderStreamDecoder
 from piighost.pipeline import ThreadAnonymizationPipeline
 
 from piighost_api.routes._rewrite import _anonymizer, _deanonymizer, _map_strings
@@ -83,3 +85,55 @@ async def deanonymize_anthropic_response(
     if isinstance(body.get("content"), list):
         body["content"] = [await _rewrite_block(block, op) for block in body["content"]]
     return body
+
+
+class AnthropicStreamRestorer:
+    """Restore tokens in an Anthropic SSE stream, per content-block index.
+
+    Anthropic streams typed events; only content_block_delta carries model text.
+    Each block index gets its own AsyncPlaceholderStreamDecoder so a token split
+    across deltas is reassembled without one block bleeding a held fragment into
+    another. text_delta.text and input_json_delta.partial_json are restored the
+    same way: we rewrite the decoded string value and re-serialize the event, so
+    JSON escaping of the restored value is automatic. Every other line, including
+    the event: lines and blank separators, passes through unchanged.
+    """
+
+    def __init__(self, replace: _StringOp) -> None:
+        self._replace = replace
+        self._decoders: dict[int, AsyncPlaceholderStreamDecoder] = {}
+
+    def _decoder(self, index: int) -> AsyncPlaceholderStreamDecoder:
+        """Return the per-index decoder, creating it on first use."""
+        decoder = self._decoders.get(index)
+        if decoder is None:
+            decoder = AsyncPlaceholderStreamDecoder(self._replace)
+            self._decoders[index] = decoder
+        return decoder
+
+    async def feed_line(self, raw: str) -> str:
+        """Restore tokens in a data line's delta; return other lines unchanged."""
+        if not raw.startswith("data:"):
+            return raw
+        payload = raw[len("data:"):].strip()
+        if not payload:
+            return raw
+        try:
+            event = json.loads(payload)
+        except ValueError:
+            return raw
+        if event.get("type") != "content_block_delta":
+            return raw
+        index = event.get("index", 0)
+        delta = event.get("delta")
+        if isinstance(delta, dict):
+            decoder = self._decoder(index)
+            if isinstance(delta.get("text"), str):
+                delta["text"] = await decoder.feed(delta["text"])
+            elif isinstance(delta.get("partial_json"), str):
+                delta["partial_json"] = await decoder.feed(delta["partial_json"])
+        return "data: " + json.dumps(event)
+
+    def flush(self) -> str:
+        """Emit any trailing fragments the decoders still hold (truncated stream)."""
+        return "".join(decoder.flush() for decoder in self._decoders.values())
