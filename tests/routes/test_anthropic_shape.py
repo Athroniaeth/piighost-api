@@ -129,7 +129,9 @@ async def test_deanonymize_tool_use_input(pipeline) -> None:
     assert body["content"][0]["input"]["cmd"] == "echo Patrick"
 
 
-def _restorer(pipeline: ThreadAnonymizationPipeline, thread_id: str) -> AnthropicStreamRestorer:
+def _restorer(
+    pipeline: ThreadAnonymizationPipeline, thread_id: str
+) -> AnthropicStreamRestorer:
     """Build a restorer that deanonymizes tokens via the given pipeline thread."""
 
     async def replace(token: str) -> str:

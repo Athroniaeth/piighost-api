@@ -116,9 +116,7 @@ def build_anthropic_router(
         thread_id, ephemeral = resolve_thread(request)
         try:
             await anonymize_anthropic_request(body, pipeline, thread_id)
-            upstream = await forward_json(
-                base, "messages/count_tokens", headers, body
-            )
+            upstream = await forward_json(base, "messages/count_tokens", headers, body)
             return Response(
                 content=upstream.content,
                 status_code=upstream.status_code,

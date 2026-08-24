@@ -115,7 +115,7 @@ class AnthropicStreamRestorer:
         """Restore tokens in a data line's delta; return other lines unchanged."""
         if not raw.startswith("data:"):
             return raw
-        payload = raw[len("data:"):].strip()
+        payload = raw[len("data:") :].strip()
         if not payload:
             return raw
         try:
