@@ -99,8 +99,10 @@ retry-after. Both system-prompt knobs are therefore off by default:
   relayed untouched so the upstream can still validate the client. Set it to `true`
   to anonymize the system prompt as well, only on an account that tolerates it.
 - `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` (default off): the guidance note is not
-  injected, for the same reason. Set it to `default` or custom text only where a
-  modified system prompt is tolerated.
+  injected. To guide the model without touching the system prompt, set the note
+  (`default` or custom text) together with `PIIGHOST_ANTHROPIC_NOTE_PLACEMENT=user`,
+  which prepends it to the first user message instead. The `system` placement
+  works only where a modified system prompt is tolerated.
 - Permissive header forwarding (always on for `/anthropic`) keeps the client's
   user-agent and beta flags, which the upstream may require.
 

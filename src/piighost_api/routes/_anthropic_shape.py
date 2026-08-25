@@ -101,6 +101,35 @@ def inject_system_note(body: dict[str, Any], note: str) -> dict[str, Any]:
     return body
 
 
+def inject_user_note(body: dict[str, Any], note: str) -> dict[str, Any]:
+    """Prepend a guidance note to the first user message's content, in place.
+
+    A message-level alternative to inject_system_note for accounts that validate
+    the system prompt and reject any change to it: the note rides in the first user
+    turn, which the fingerprint check tolerates. The note prefixes a string
+    content, or becomes the first text block of a list content. An empty note, or a
+    body with no user message, is a no-op.
+    """
+    if not note:
+        return body
+    messages = body.get("messages")
+    if not isinstance(messages, list):
+        return body
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            message["content"] = note + "\n\n" + content
+        elif isinstance(content, list):
+            note_block = {"type": "text", "text": note}
+            message["content"] = [note_block, *content]
+        else:
+            continue
+        return body
+    return body
+
+
 async def anonymize_anthropic_request(
     body: dict[str, Any],
     pipeline: ThreadAnonymizationPipeline,

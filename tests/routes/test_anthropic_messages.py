@@ -1,5 +1,7 @@
 """Integration tests for the Anthropic-proxy messages route."""
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -366,6 +368,39 @@ def test_placeholder_note_prepended_to_system() -> None:
     forwarded = route.calls.last.request.content.decode()
     assert DEFAULT_PLACEHOLDER_NOTE in forwarded
     assert "You are a helpful assistant." in forwarded
+
+
+@respx.mock
+def test_placeholder_note_in_user_message_leaves_system() -> None:
+    """With note_placement='user', the note rides in the first user message, system pristine."""
+    detector = ExactMatchDetector({"Patrick": "PERSON"})
+    pipeline = ThreadAnonymizationPipeline(detector)
+    router = build_anthropic_router(
+        pipeline,
+        default_upstream=_DEFAULT,
+        placeholder_note=DEFAULT_PLACEHOLDER_NOTE,
+        note_placement="user",
+    )
+    app = Litestar(route_handlers=[router])
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"type": "message", "role": "assistant", "content": []}
+        )
+    )
+    with TestClient(app=app) as tc:
+        tc.post(
+            "/anthropic/v1/messages",
+            headers=_HEADERS,
+            json={
+                "model": "claude-3-5-sonnet",
+                "max_tokens": 16,
+                "system": "You are a helpful assistant.",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+    forwarded = json.loads(route.calls.last.request.content)
+    assert forwarded["system"] == "You are a helpful assistant."
+    assert DEFAULT_PLACEHOLDER_NOTE in forwarded["messages"][0]["content"]
 
 
 @respx.mock

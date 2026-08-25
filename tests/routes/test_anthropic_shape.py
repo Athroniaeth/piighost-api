@@ -14,6 +14,7 @@ from piighost_api.routes._anthropic_shape import (
     anonymize_anthropic_request,
     deanonymize_anthropic_response,
     inject_system_note,
+    inject_user_note,
 )
 
 
@@ -258,3 +259,43 @@ def test_inject_system_note_empty_is_a_no_op() -> None:
     body: dict[str, Any] = {"system": "keep"}
     inject_system_note(body, "")
     assert body["system"] == "keep"
+
+
+def test_inject_user_note_prefixes_string_user_message() -> None:
+    """The note prefixes the first user message, leaving the system prompt untouched."""
+    body: dict[str, Any] = {
+        "system": "You are Claude Code.",
+        "messages": [{"role": "user", "content": "hello"}],
+    }
+    inject_user_note(body, "NOTE")
+    assert body["messages"][0]["content"] == "NOTE\n\nhello"
+    assert body["system"] == "You are Claude Code."
+
+
+def test_inject_user_note_prepends_block_to_list_user_message() -> None:
+    """A block-list user content gets the note as its first text block."""
+    original = {"type": "text", "text": "hello"}
+    body: dict[str, Any] = {"messages": [{"role": "user", "content": [original]}]}
+    inject_user_note(body, "NOTE")
+    assert body["messages"][0]["content"][0] == {"type": "text", "text": "NOTE"}
+    assert body["messages"][0]["content"][1] == original
+
+
+def test_inject_user_note_targets_the_first_user_message() -> None:
+    """With an assistant turn first, the note still lands on the first user message."""
+    body: dict[str, Any] = {
+        "messages": [
+            {"role": "assistant", "content": "hi"},
+            {"role": "user", "content": "hello"},
+        ]
+    }
+    inject_user_note(body, "NOTE")
+    assert body["messages"][0]["content"] == "hi"
+    assert body["messages"][1]["content"] == "NOTE\n\nhello"
+
+
+def test_inject_user_note_empty_is_a_no_op() -> None:
+    """An empty note leaves the messages untouched."""
+    body: dict[str, Any] = {"messages": [{"role": "user", "content": "keep"}]}
+    inject_user_note(body, "")
+    assert body["messages"][0]["content"] == "keep"

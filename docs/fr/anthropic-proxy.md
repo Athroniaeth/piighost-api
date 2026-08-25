@@ -100,8 +100,10 @@ prompt système sont donc désactivés par défaut :
   `true` pour anonymiser aussi le prompt système, uniquement sur un compte qui le
   tolère.
 - `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` (désactivé par défaut) : la consigne n'est
-  pas injectée, pour la même raison. Mettez-la à `default` ou à un texte
-  personnalisé seulement là où un prompt système modifié est toléré.
+  pas injectée. Pour guider le modèle sans toucher au prompt système, définissez la
+  consigne (`default` ou un texte) avec `PIIGHOST_ANTHROPIC_NOTE_PLACEMENT=user`,
+  qui la préfixe au premier message utilisateur à la place. Le placement `system`
+  ne marche que là où un prompt système modifié est toléré.
 - Le forwarding permissif des headers (toujours actif sur `/anthropic`) conserve
   le user-agent et les flags beta de l'appelant, que l'upstream peut exiger.
 

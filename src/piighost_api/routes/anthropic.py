@@ -23,6 +23,7 @@ from piighost_api.routes._anthropic_shape import (
     anonymize_anthropic_request,
     deanonymize_anthropic_response,
     inject_system_note,
+    inject_user_note,
 )
 from piighost_api.routes._relay import (
     _client,
@@ -79,16 +80,18 @@ def build_anthropic_router(
     default_upstream: str | None = None,
     anonymize_system: bool = True,
     placeholder_note: str | None = None,
+    note_placement: str = "system",
 ) -> Router:
     """Build the /anthropic/v1 router over the given pipeline and default upstream.
 
     When anonymize_system is False the system prompt is relayed untouched, for a
     subscription- or enterprise-authenticated harness whose client fingerprint the
     upstream validates; message content is anonymized regardless. placeholder_note
-    is opt-in guidance prepended to the system prompt, off by default: any change
-    to the system prompt (this note, or anonymize_system) breaks that fingerprint
-    validation on such accounts, so the upstream rejects the request. Pass a note
-    only for accounts that tolerate a modified system prompt (e.g. a raw API key).
+    is opt-in guidance for the model, off by default. note_placement chooses where
+    it goes: "system" prepends it to the system prompt (rejected by accounts that
+    validate the system-prompt fingerprint), "user" prepends it to the first user
+    message instead, which those accounts tolerate since message content is not
+    part of the fingerprint.
     """
 
     async def _read_body(request: Request) -> dict:
@@ -103,6 +106,15 @@ def build_anthropic_router(
             )
         return body
 
+    def _apply_note(body: dict) -> None:
+        """Inject the guidance note at the configured placement, if one is set."""
+        if not placeholder_note:
+            return
+        if note_placement == "user":
+            inject_user_note(body, placeholder_note)
+        else:
+            inject_system_note(body, placeholder_note)
+
     @post("/messages", exclude_from_auth=True)
     async def messages(request: Request) -> Response:
         """Anonymize the request, relay it upstream, and deanonymize the reply."""
@@ -115,8 +127,7 @@ def build_anthropic_router(
             await anonymize_anthropic_request(
                 body, pipeline, thread_id, anonymize_system
             )
-            if placeholder_note:
-                inject_system_note(body, placeholder_note)
+            _apply_note(body)
             if body.get("stream"):
                 stream_request = _client.build_request(
                     "POST",
@@ -188,8 +199,7 @@ def build_anthropic_router(
             await anonymize_anthropic_request(
                 body, pipeline, thread_id, anonymize_system
             )
-            if placeholder_note:
-                inject_system_note(body, placeholder_note)
+            _apply_note(body)
             upstream = await forward_json(
                 base, "messages/count_tokens", headers, body, params
             )

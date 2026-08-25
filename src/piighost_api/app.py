@@ -263,12 +263,16 @@ def create_app(config_path: Path) -> Litestar:
         placeholder_note = DEFAULT_PLACEHOLDER_NOTE
     else:
         placeholder_note = raw_note or None
+    # "user" injects the note into the first user message instead of the system
+    # prompt, for accounts that reject a modified system prompt.
+    note_placement = os.getenv("PIIGHOST_ANTHROPIC_NOTE_PLACEMENT", "system")
     openai_router = build_openai_router(pipeline, openai_upstream)
     anthropic_router = build_anthropic_router(
         pipeline,
         anthropic_upstream,
         anonymize_system=anonymize_system,
         placeholder_note=placeholder_note,
+        note_placement=note_placement,
     )
 
     if configure_observation():
