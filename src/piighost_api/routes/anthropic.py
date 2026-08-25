@@ -17,9 +17,11 @@ from litestar.response import Stream
 from piighost.pipeline import ThreadAnonymizationPipeline
 
 from piighost_api.routes._anthropic_shape import (
+    DEFAULT_PLACEHOLDER_NOTE,
     AnthropicStreamRestorer,
     anonymize_anthropic_request,
     deanonymize_anthropic_response,
+    inject_system_note,
 )
 from piighost_api.routes._relay import _client, forward_json, resolve_thread
 from piighost_api.routes._upstream import forward_headers_permissive, upstream_base_url
@@ -61,12 +63,15 @@ def build_anthropic_router(
     pipeline: ThreadAnonymizationPipeline,
     default_upstream: str | None = None,
     anonymize_system: bool = True,
+    placeholder_note: str | None = DEFAULT_PLACEHOLDER_NOTE,
 ) -> Router:
     """Build the /anthropic/v1 router over the given pipeline and default upstream.
 
     When anonymize_system is False the system prompt is relayed untouched, for a
     subscription-authenticated harness whose client fingerprint the upstream
-    validates; message content is anonymized regardless.
+    validates; message content is anonymized regardless. placeholder_note is a
+    short guidance prepended to the system prompt so the model handles the tokens
+    fluently; pass None to inject nothing.
     """
 
     async def _read_body(request: Request) -> dict:
@@ -92,6 +97,8 @@ def build_anthropic_router(
             await anonymize_anthropic_request(
                 body, pipeline, thread_id, anonymize_system
             )
+            if placeholder_note:
+                inject_system_note(body, placeholder_note)
             if body.get("stream"):
                 stream = _stream_upstream(
                     base, headers, body, pipeline, thread_id, ephemeral
@@ -127,6 +134,8 @@ def build_anthropic_router(
             await anonymize_anthropic_request(
                 body, pipeline, thread_id, anonymize_system
             )
+            if placeholder_note:
+                inject_system_note(body, placeholder_note)
             upstream = await forward_json(base, "messages/count_tokens", headers, body)
             return Response(
                 content=upstream.content,

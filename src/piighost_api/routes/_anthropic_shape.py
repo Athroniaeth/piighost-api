@@ -66,6 +66,41 @@ async def _rewrite_messages(messages: Any, op: _StringOp) -> None:
             message["content"] = await _rewrite_content(message["content"], op)
 
 
+DEFAULT_PLACEHOLDER_NOTE = (
+    "Privacy note: this conversation has been de-identified. Some values (names, "
+    "emails, phone numbers, and other personal data) are replaced by stable "
+    "placeholder tokens of the form <<LABEL:N>>, such as <<PERSON:1>> or "
+    "<<EMAIL:2>>. Each token always refers to the same underlying value. Treat a "
+    "token as the value it stands for, and reuse the exact same token verbatim "
+    "wherever you would use that value, in prose, code, tool calls, or file "
+    "contents. Do not invent or guess the real value, and do not point out that a "
+    "value is masked unless the user explicitly asks about anonymization. The "
+    "tokens are restored to their real values before the user sees your reply, so "
+    "answer naturally as if the real values were present."
+)
+"""Guidance prepended to the system prompt so the model handles tokens fluently."""
+
+
+def inject_system_note(body: dict[str, Any], note: str) -> dict[str, Any]:
+    """Prepend a guidance note to the request's system prompt, in place.
+
+    Explains the placeholder tokens to the model so it uses them naturally. The
+    note becomes the first system text block, or prefixes a string system, or
+    stands alone when there is no system prompt. An empty note is a no-op.
+    """
+    if not note:
+        return body
+    system = body.get("system")
+    if system is None:
+        body["system"] = note
+    elif isinstance(system, str):
+        body["system"] = note + "\n\n" + system
+    elif isinstance(system, list):
+        note_block = {"type": "text", "text": note}
+        body["system"] = [note_block, *system]
+    return body
+
+
 async def anonymize_anthropic_request(
     body: dict[str, Any],
     pipeline: ThreadAnonymizationPipeline,

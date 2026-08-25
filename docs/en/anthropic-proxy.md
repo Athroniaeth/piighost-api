@@ -70,6 +70,10 @@ Claude Code picks up `ANTHROPIC_BASE_URL` automatically and routes every call th
   `host`, `content-length`, `accept-encoding`, and the `X-PIIGhost-*` control
   headers. This keeps the caller's user-agent and beta flags intact for upstreams
   that validate them.
+- A short guidance note is prepended to the system prompt so the model handles
+  the placeholder tokens fluently: reuse them verbatim and do not remark that a
+  value is masked. Customize it with `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE`, or
+  disable it by setting that variable to an empty string.
 - Each request is a fresh ephemeral thread, matching how Claude Code resends the
   whole history every turn. Pass `X-PIIGhost-Thread-ID` only if you want a
   persistent thread you manage yourself.

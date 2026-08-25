@@ -9,9 +9,11 @@ from piighost.components.detector import ExactMatchDetector
 from piighost.pipeline import ThreadAnonymizationPipeline
 
 from piighost_api.routes._anthropic_shape import (
+    DEFAULT_PLACEHOLDER_NOTE,
     AnthropicStreamRestorer,
     anonymize_anthropic_request,
     deanonymize_anthropic_response,
+    inject_system_note,
 )
 
 
@@ -226,3 +228,33 @@ async def test_anonymize_skips_system_when_disabled(pipeline) -> None:
     assert body["system"] == "You help Patrick."
     assert "Patrick" not in body["messages"][0]["content"]
     assert "<<PERSON:1>>" in body["messages"][0]["content"]
+
+
+def test_inject_system_note_sets_absent_system() -> None:
+    """With no system field, the note becomes the system prompt."""
+    body: dict[str, Any] = {"messages": []}
+    inject_system_note(body, DEFAULT_PLACEHOLDER_NOTE)
+    assert body["system"] == DEFAULT_PLACEHOLDER_NOTE
+
+
+def test_inject_system_note_prefixes_string_system() -> None:
+    """A string system prompt keeps its text, prefixed by the note."""
+    body: dict[str, Any] = {"system": "You are a helpful assistant."}
+    inject_system_note(body, "NOTE")
+    assert body["system"] == "NOTE\n\nYou are a helpful assistant."
+
+
+def test_inject_system_note_prepends_block_to_list_system() -> None:
+    """A block-list system prompt gets the note as its first text block."""
+    original = {"type": "text", "text": "You are Claude Code."}
+    body: dict[str, Any] = {"system": [original]}
+    inject_system_note(body, "NOTE")
+    assert body["system"][0] == {"type": "text", "text": "NOTE"}
+    assert body["system"][1] == original
+
+
+def test_inject_system_note_empty_is_a_no_op() -> None:
+    """An empty note leaves the body untouched."""
+    body: dict[str, Any] = {"system": "keep"}
+    inject_system_note(body, "")
+    assert body["system"] == "keep"

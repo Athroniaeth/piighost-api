@@ -9,7 +9,10 @@ from litestar.testing import TestClient
 from piighost.components.detector import ExactMatchDetector
 from piighost.pipeline import ThreadAnonymizationPipeline
 
-from piighost_api.routes.anthropic import build_anthropic_router
+from piighost_api.routes.anthropic import (
+    DEFAULT_PLACEHOLDER_NOTE,
+    build_anthropic_router,
+)
 
 _DEFAULT = "https://api.anthropic.com/v1"
 """Default upstream URL used when no X-PIIGhost-Upstream header is supplied."""
@@ -27,7 +30,11 @@ def client() -> TestClient:
     """TestClient over a Litestar app with the Anthropic router and a known detector."""
     detector = ExactMatchDetector({"Patrick": "PERSON"})
     pipeline = ThreadAnonymizationPipeline(detector)
-    router = build_anthropic_router(pipeline, default_upstream=_DEFAULT)
+    # No placeholder note here: it embeds an example <<PERSON:1>>, which would make
+    # the token-presence assertions trivially pass. The note has its own tests.
+    router = build_anthropic_router(
+        pipeline, default_upstream=_DEFAULT, placeholder_note=None
+    )
     app = Litestar(route_handlers=[router])
     return TestClient(app=app)
 
@@ -295,7 +302,10 @@ def test_system_preserved_when_disabled_and_headers_relayed() -> None:
     detector = ExactMatchDetector({"Patrick": "PERSON"})
     pipeline = ThreadAnonymizationPipeline(detector)
     router = build_anthropic_router(
-        pipeline, default_upstream=_DEFAULT, anonymize_system=False
+        pipeline,
+        default_upstream=_DEFAULT,
+        anonymize_system=False,
+        placeholder_note=None,
     )
     app = Litestar(route_handlers=[router])
     route = respx.post("https://api.anthropic.com/v1/messages").mock(
@@ -327,3 +337,52 @@ def test_system_preserved_when_disabled_and_headers_relayed() -> None:
     assert "<<PERSON:1>>" in forwarded_body
     assert forwarded_headers["user-agent"] == "claude-cli/1.2.3"
     assert forwarded_headers["authorization"] == "Bearer oauth"
+
+
+@respx.mock
+def test_placeholder_note_prepended_to_system() -> None:
+    """The guidance note is prepended to the system prompt the upstream receives."""
+    detector = ExactMatchDetector({"Patrick": "PERSON"})
+    pipeline = ThreadAnonymizationPipeline(detector)
+    router = build_anthropic_router(pipeline, default_upstream=_DEFAULT)
+    app = Litestar(route_handlers=[router])
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"type": "message", "role": "assistant", "content": []}
+        )
+    )
+    with TestClient(app=app) as tc:
+        tc.post(
+            "/anthropic/v1/messages",
+            headers=_HEADERS,
+            json={
+                "model": "claude-3-5-sonnet",
+                "max_tokens": 16,
+                "system": "You are a helpful assistant.",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+    forwarded = route.calls.last.request.content.decode()
+    assert DEFAULT_PLACEHOLDER_NOTE in forwarded
+    assert "You are a helpful assistant." in forwarded
+
+
+@respx.mock
+def test_placeholder_note_absent_when_disabled(client: TestClient) -> None:
+    """With placeholder_note=None (the fixture), no note reaches the upstream."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"type": "message", "role": "assistant", "content": []}
+        )
+    )
+    client.post(
+        "/anthropic/v1/messages",
+        headers=_HEADERS,
+        json={
+            "model": "claude-3-5-sonnet",
+            "max_tokens": 16,
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    forwarded = route.calls.last.request.content.decode()
+    assert "Privacy note" not in forwarded

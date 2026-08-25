@@ -69,6 +69,11 @@ Claude Code lit `ANTHROPIC_BASE_URL` automatiquement et route chaque appel via l
   hop-by-hop, `host`, `content-length`, `accept-encoding` et les headers de
   contrôle `X-PIIGhost-*`. Cela préserve le user-agent et les flags beta de
   l'appelant pour les upstreams qui les valident.
+- Une courte consigne est préfixée au prompt système pour que le modèle manie
+  les jetons de substitution avec fluidité : les réutiliser verbatim et ne pas
+  signaler qu'une valeur est masquée. Personnalisez-la avec
+  `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE`, ou désactivez-la en mettant cette
+  variable à une chaîne vide.
 - Chaque requête est un thread éphémère, ce qui correspond au comportement de
   Claude Code qui renvoie tout l'historique à chaque tour. Passez
   `X-PIIGhost-Thread-ID` uniquement si vous gérez vous-même un thread persistant.

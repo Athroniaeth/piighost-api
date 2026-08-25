@@ -38,7 +38,10 @@ from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import AuthState, create_auth_guard
 from piighost_api.observation import configure_observation
-from piighost_api.routes.anthropic import build_anthropic_router
+from piighost_api.routes.anthropic import (
+    DEFAULT_PLACEHOLDER_NOTE,
+    build_anthropic_router,
+)
 from piighost_api.routes.openai import build_openai_router
 
 logger = logging.getLogger(__name__)
@@ -253,9 +256,16 @@ def create_app(config_path: Path) -> Litestar:
     anonymize_system = os.getenv(
         "PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM", "false"
     ).strip().lower() in ("1", "true", "yes", "on")
+    placeholder_note = (
+        os.getenv("PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE", DEFAULT_PLACEHOLDER_NOTE)
+        or None
+    )
     openai_router = build_openai_router(pipeline, openai_upstream)
     anthropic_router = build_anthropic_router(
-        pipeline, anthropic_upstream, anonymize_system=anonymize_system
+        pipeline,
+        anthropic_upstream,
+        anonymize_system=anonymize_system,
+        placeholder_note=placeholder_note,
     )
 
     if configure_observation():
