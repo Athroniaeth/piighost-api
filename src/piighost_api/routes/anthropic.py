@@ -19,7 +19,6 @@ from litestar.response import Stream
 from piighost.pipeline import ThreadAnonymizationPipeline
 
 from piighost_api.routes._anthropic_shape import (
-    DEFAULT_PLACEHOLDER_NOTE,
     AnthropicStreamRestorer,
     anonymize_anthropic_request,
     deanonymize_anthropic_response,
@@ -79,15 +78,17 @@ def build_anthropic_router(
     pipeline: ThreadAnonymizationPipeline,
     default_upstream: str | None = None,
     anonymize_system: bool = True,
-    placeholder_note: str | None = DEFAULT_PLACEHOLDER_NOTE,
+    placeholder_note: str | None = None,
 ) -> Router:
     """Build the /anthropic/v1 router over the given pipeline and default upstream.
 
     When anonymize_system is False the system prompt is relayed untouched, for a
-    subscription-authenticated harness whose client fingerprint the upstream
-    validates; message content is anonymized regardless. placeholder_note is a
-    short guidance prepended to the system prompt so the model handles the tokens
-    fluently; pass None to inject nothing.
+    subscription- or enterprise-authenticated harness whose client fingerprint the
+    upstream validates; message content is anonymized regardless. placeholder_note
+    is opt-in guidance prepended to the system prompt, off by default: any change
+    to the system prompt (this note, or anonymize_system) breaks that fingerprint
+    validation on such accounts, so the upstream rejects the request. Pass a note
+    only for accounts that tolerate a modified system prompt (e.g. a raw API key).
     """
 
     async def _read_body(request: Request) -> dict:

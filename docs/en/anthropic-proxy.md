@@ -70,10 +70,13 @@ Claude Code picks up `ANTHROPIC_BASE_URL` automatically and routes every call th
   `host`, `content-length`, `accept-encoding`, and the `X-PIIGhost-*` control
   headers. This keeps the caller's user-agent and beta flags intact for upstreams
   that validate them.
-- A short guidance note is prepended to the system prompt so the model handles
-  the placeholder tokens fluently: reuse them verbatim and do not remark that a
-  value is masked. Customize it with `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE`, or
-  disable it by setting that variable to an empty string.
+- A short guidance note that helps the model handle placeholder tokens fluently is
+  available but **off by default**: prepending it modifies the system prompt, which
+  breaks the client-fingerprint validation some accounts enforce (enterprise or
+  OAuth), and the upstream then rejects the request with a 429. Enable it only on
+  accounts that tolerate a modified system prompt: set
+  `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` to `default` for the built-in note, or to
+  your own text.
 - Each request is a fresh ephemeral thread, matching how Claude Code resends the
   whole history every turn. Pass `X-PIIGhost-Thread-ID` only if you want a
   persistent thread you manage yourself.
@@ -88,15 +91,20 @@ either drops you out of subscription mode or fails. Anthropic also validates the
 client fingerprint of OAuth requests, so a modifying proxy is not a supported path
 for a subscription.
 
-Two knobs help a subscription or fingerprint-sensitive gateway, and the first is
-the default because a coding harness is the primary target:
+The same fingerprint validation applies to enterprise API-key accounts. Any change
+to the system prompt trips it, observed as a 429 with a generic error and no
+retry-after. Both system-prompt knobs are therefore off by default:
 
-- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (default `false`): by default the system
-  prompt is relayed untouched so the upstream can still validate the client. Set
-  it to `true` to anonymize the system prompt as well. Message and tool content
-  are anonymized either way. If your system prompt can carry PII, set it to `true`.
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (default `false`): the system prompt is
+  relayed untouched so the upstream can still validate the client. Set it to `true`
+  to anonymize the system prompt as well, only on an account that tolerates it.
+- `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` (default off): the guidance note is not
+  injected, for the same reason. Set it to `default` or custom text only where a
+  modified system prompt is tolerated.
 - Permissive header forwarding (always on for `/anthropic`) keeps the client's
-  user-agent and OAuth beta flags, which the upstream may require.
+  user-agent and beta flags, which the upstream may require.
+
+Message and tool content are anonymized regardless of these knobs.
 
 ## Known limitations
 

@@ -69,11 +69,13 @@ Claude Code lit `ANTHROPIC_BASE_URL` automatiquement et route chaque appel via l
   hop-by-hop, `host`, `content-length`, `accept-encoding` et les headers de
   contrôle `X-PIIGhost-*`. Cela préserve le user-agent et les flags beta de
   l'appelant pour les upstreams qui les valident.
-- Une courte consigne est préfixée au prompt système pour que le modèle manie
-  les jetons de substitution avec fluidité : les réutiliser verbatim et ne pas
-  signaler qu'une valeur est masquée. Personnalisez-la avec
-  `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE`, ou désactivez-la en mettant cette
-  variable à une chaîne vide.
+- Une courte consigne qui aide le modèle à manier les jetons de substitution avec
+  fluidité existe, mais elle est **désactivée par défaut** : la préfixer modifie le
+  prompt système, ce qui casse la validation d'empreinte client imposée par
+  certains comptes (entreprise ou OAuth), et l'upstream rejette alors la requête
+  avec un 429. Ne l'activez que sur un compte qui tolère un prompt système
+  modifié : mettez `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` à `default` pour la
+  consigne intégrée, ou à votre propre texte.
 - Chaque requête est un thread éphémère, ce qui correspond au comportement de
   Claude Code qui renvoie tout l'historique à chaque tour. Passez
   `X-PIIGhost-Thread-ID` uniquement si vous gérez vous-même un thread persistant.
@@ -88,16 +90,22 @@ cela vous sort du mode abonnement ou échoue. Anthropic valide aussi l'empreinte
 client des requêtes OAuth, donc un proxy qui modifie les requêtes n'est pas un
 chemin pris en charge pour un abonnement.
 
-Deux réglages aident un abonnement, ou une passerelle sensible à l'empreinte, et
-le premier est le défaut car un harness de code est la cible principale :
+La même validation d'empreinte s'applique aux comptes entreprise à clé d'API.
+Toute modification du prompt système la fait échouer, ce qui se manifeste par un
+429 au message générique et sans `retry-after`. Les deux réglages qui touchent au
+prompt système sont donc désactivés par défaut :
 
-- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (défaut `false`) : par défaut le prompt
-  système est relayé intact afin que l'upstream puisse encore valider le client.
-  Mettez-le à `true` pour anonymiser aussi le prompt système. Le contenu des
-  messages et des outils reste anonymisé dans tous les cas. Si votre prompt
-  système peut contenir des données personnelles, mettez-le à `true`.
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (défaut `false`) : le prompt système est
+  relayé intact afin que l'upstream puisse encore valider le client. Mettez-le à
+  `true` pour anonymiser aussi le prompt système, uniquement sur un compte qui le
+  tolère.
+- `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` (désactivé par défaut) : la consigne n'est
+  pas injectée, pour la même raison. Mettez-la à `default` ou à un texte
+  personnalisé seulement là où un prompt système modifié est toléré.
 - Le forwarding permissif des headers (toujours actif sur `/anthropic`) conserve
-  le user-agent et les flags beta OAuth de l'appelant, que l'upstream peut exiger.
+  le user-agent et les flags beta de l'appelant, que l'upstream peut exiger.
+
+Le contenu des messages et des outils reste anonymisé quels que soient ces réglages.
 
 ## Limites connues
 

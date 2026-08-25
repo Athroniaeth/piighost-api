@@ -9,10 +9,8 @@ from litestar.testing import TestClient
 from piighost.components.detector import ExactMatchDetector
 from piighost.pipeline import ThreadAnonymizationPipeline
 
-from piighost_api.routes.anthropic import (
-    DEFAULT_PLACEHOLDER_NOTE,
-    build_anthropic_router,
-)
+from piighost_api.routes._anthropic_shape import DEFAULT_PLACEHOLDER_NOTE
+from piighost_api.routes.anthropic import build_anthropic_router
 
 _DEFAULT = "https://api.anthropic.com/v1"
 """Default upstream URL used when no X-PIIGhost-Upstream header is supplied."""
@@ -342,10 +340,12 @@ def test_system_preserved_when_disabled_and_headers_relayed() -> None:
 
 @respx.mock
 def test_placeholder_note_prepended_to_system() -> None:
-    """The guidance note is prepended to the system prompt the upstream receives."""
+    """The guidance note, opt-in, is prepended to the system prompt when configured."""
     detector = ExactMatchDetector({"Patrick": "PERSON"})
     pipeline = ThreadAnonymizationPipeline(detector)
-    router = build_anthropic_router(pipeline, default_upstream=_DEFAULT)
+    router = build_anthropic_router(
+        pipeline, default_upstream=_DEFAULT, placeholder_note=DEFAULT_PLACEHOLDER_NOTE
+    )
     app = Litestar(route_handlers=[router])
     route = respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(
