@@ -8,6 +8,7 @@ base URL and is overridable per request with X-PIIGhost-Upstream. The caller's
 x-api-key or authorization is forwarded, so these routes carry exclude_from_auth.
 """
 
+import logging
 from collections.abc import AsyncIterator
 
 import httpx
@@ -31,6 +32,19 @@ from piighost_api.routes._relay import (
     resolve_thread,
 )
 from piighost_api.routes._upstream import forward_headers_permissive, upstream_base_url
+
+logger = logging.getLogger(__name__)
+
+
+def _log_upstream_error(status: int, headers: "httpx.Headers", body: bytes) -> None:
+    """Log an upstream error status with its retry-after and message for diagnosis."""
+    logger.warning(
+        "Anthropic upstream error %s (retry-after=%s, ratelimit=%s): %s",
+        status,
+        headers.get("retry-after"),
+        headers.get("anthropic-ratelimit-requests-remaining"),
+        body[:400].decode("utf-8", "replace"),
+    )
 
 
 def _consume_upstream_stream(
@@ -122,6 +136,7 @@ def build_anthropic_router(
                     # and backs off instead of hammering a rate limit.
                     content = await upstream.aread()
                     await upstream.aclose()
+                    _log_upstream_error(upstream.status_code, upstream.headers, content)
                     return Response(
                         content=content,
                         status_code=upstream.status_code,
@@ -145,6 +160,10 @@ def build_anthropic_router(
                     content=payload,
                     status_code=upstream.status_code,
                     headers=relay_response_headers(upstream.headers),
+                )
+            if upstream.status_code >= 400:
+                _log_upstream_error(
+                    upstream.status_code, upstream.headers, upstream.content
                 )
             return Response(
                 content=upstream.content,
