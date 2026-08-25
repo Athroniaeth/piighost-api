@@ -407,3 +407,50 @@ def test_query_params_forwarded_to_upstream(client: TestClient) -> None:
         },
     )
     assert "beta=true" in str(route.calls.last.request.url)
+
+
+@respx.mock
+def test_non_stream_relays_retry_after(client: TestClient) -> None:
+    """A non-streaming 429 relays retry-after so the client can back off."""
+    respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            429,
+            json={"type": "error", "error": {"type": "rate_limit_error"}},
+            headers={"retry-after": "12"},
+        )
+    )
+    response = client.post(
+        "/anthropic/v1/messages",
+        headers=_HEADERS,
+        json={
+            "model": "claude-3-5-sonnet",
+            "max_tokens": 8,
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    assert response.status_code == 429
+    assert response.headers.get("retry-after") == "12"
+
+
+@respx.mock
+def test_streaming_upstream_error_relayed_as_status(client: TestClient) -> None:
+    """A streaming request whose upstream errors is relayed as that status, not a 200 stream."""
+    respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            429,
+            json={"type": "error", "error": {"type": "rate_limit_error"}},
+            headers={"retry-after": "30"},
+        )
+    )
+    response = client.post(
+        "/anthropic/v1/messages",
+        headers=_HEADERS,
+        json={
+            "model": "claude-3-5-sonnet",
+            "max_tokens": 8,
+            "stream": True,
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    assert response.status_code == 429
+    assert response.headers.get("retry-after") == "30"

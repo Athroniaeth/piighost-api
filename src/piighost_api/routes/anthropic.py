@@ -10,6 +10,7 @@ x-api-key or authorization is forwarded, so these routes carry exclude_from_auth
 
 from collections.abc import AsyncIterator
 
+import httpx
 from litestar import Request, Response, Router, post
 from litestar.exceptions import HTTPException
 from litestar.response import Stream
@@ -23,20 +24,22 @@ from piighost_api.routes._anthropic_shape import (
     deanonymize_anthropic_response,
     inject_system_note,
 )
-from piighost_api.routes._relay import _client, forward_json, resolve_thread
+from piighost_api.routes._relay import (
+    _client,
+    forward_json,
+    relay_response_headers,
+    resolve_thread,
+)
 from piighost_api.routes._upstream import forward_headers_permissive, upstream_base_url
 
 
-def _stream_upstream(
-    base: str,
-    headers: dict[str, str],
-    body: dict,
+def _consume_upstream_stream(
+    upstream: httpx.Response,
     pipeline: ThreadAnonymizationPipeline,
     thread_id: str,
     ephemeral: bool,
-    params: dict[str, str] | None = None,
 ) -> AsyncIterator[bytes]:
-    """Yield restored SSE bytes from the upstream stream, then forget if ephemeral."""
+    """Yield restored SSE bytes from an already-open upstream stream, then clean up."""
 
     async def replace(token: str) -> str:
         return await pipeline.deanonymize(token, thread_id)
@@ -44,16 +47,14 @@ def _stream_upstream(
     async def generator() -> AsyncIterator[bytes]:
         restorer = AnthropicStreamRestorer(replace)
         try:
-            async with _client.stream(
-                "POST", f"{base}/messages", headers=headers, json=body, params=params
-            ) as upstream:
-                async for line in upstream.aiter_lines():
-                    restored = await restorer.feed_line(line)
-                    yield (restored + "\n").encode()
+            async for line in upstream.aiter_lines():
+                restored = await restorer.feed_line(line)
+                yield (restored + "\n").encode()
             trailing = restorer.flush()
             if trailing:
                 yield trailing.encode()
         finally:
+            await upstream.aclose()
             if ephemeral:
                 await pipeline.forget_thread(thread_id)
 
@@ -102,8 +103,33 @@ def build_anthropic_router(
             if placeholder_note:
                 inject_system_note(body, placeholder_note)
             if body.get("stream"):
-                stream = _stream_upstream(
-                    base, headers, body, pipeline, thread_id, ephemeral, params
+                stream_request = _client.build_request(
+                    "POST",
+                    f"{base}/messages",
+                    headers=headers,
+                    json=body,
+                    params=params,
+                )
+                try:
+                    upstream = await _client.send(stream_request, stream=True)
+                except httpx.RequestError as exc:
+                    raise HTTPException(
+                        status_code=502, detail=f"Upstream request failed: {exc}"
+                    )
+                if upstream.status_code >= 400:
+                    # Do not commit to a 200 stream on an error: relay it as a
+                    # normal response so the client sees the status and retry-after
+                    # and backs off instead of hammering a rate limit.
+                    content = await upstream.aread()
+                    await upstream.aclose()
+                    return Response(
+                        content=content,
+                        status_code=upstream.status_code,
+                        media_type=upstream.headers.get("content-type"),
+                        headers=relay_response_headers(upstream.headers),
+                    )
+                stream = _consume_upstream_stream(
+                    upstream, pipeline, thread_id, ephemeral
                 )
                 ephemeral = False  # the generator owns the forget now
                 return Stream(stream, media_type="text/event-stream", status_code=200)
@@ -115,11 +141,16 @@ def build_anthropic_router(
             ):
                 payload = upstream.json()
                 await deanonymize_anthropic_response(payload, pipeline, thread_id)
-                return Response(content=payload, status_code=upstream.status_code)
+                return Response(
+                    content=payload,
+                    status_code=upstream.status_code,
+                    headers=relay_response_headers(upstream.headers),
+                )
             return Response(
                 content=upstream.content,
                 status_code=upstream.status_code,
                 media_type=upstream.headers.get("content-type"),
+                headers=relay_response_headers(upstream.headers),
             )
         finally:
             if ephemeral:
@@ -146,6 +177,7 @@ def build_anthropic_router(
                 content=upstream.content,
                 status_code=upstream.status_code,
                 media_type=upstream.headers.get("content-type"),
+                headers=relay_response_headers(upstream.headers),
             )
         finally:
             if ephemeral:

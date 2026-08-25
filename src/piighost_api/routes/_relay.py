@@ -17,6 +17,35 @@ _client = httpx.AsyncClient(timeout=httpx.Timeout(_RELAY_TIMEOUT))
 """Shared async HTTP client for all provider proxy routers."""
 
 
+_DROPPED_RESPONSE_HEADERS = frozenset(
+    {
+        "content-length",
+        "content-encoding",
+        "transfer-encoding",
+        "connection",
+        "keep-alive",
+        "content-type",
+    }
+)
+"""Upstream response headers the proxy must not relay: the length and encoding
+ones this server recomputes for the rewritten body, hop-by-hop, and content-type
+which each route sets from its own media type."""
+
+
+def relay_response_headers(headers: "httpx.Headers") -> dict[str, str]:
+    """Copy the upstream's response headers, keeping retry-after and rate-limit ones.
+
+    Drops the length and encoding headers the server recomputes and content-type,
+    so a client sees the upstream's retry-after and anthropic-ratelimit-* headers
+    and can back off instead of hammering into a rate limit.
+    """
+    return {
+        name: value
+        for name, value in headers.items()
+        if name.lower() not in _DROPPED_RESPONSE_HEADERS
+    }
+
+
 def resolve_thread(request: Request) -> tuple[str, bool]:
     """Return (thread_id, ephemeral): a supplied fixed id, or a fresh ephemeral one."""
     supplied = request.headers.get("x-piighost-thread-id")
