@@ -291,6 +291,7 @@ def test_stream_restores_token_split_across_deltas(client: TestClient) -> None:
             "messages": [{"role": "user", "content": "hi"}],
         },
     ) as response:
+        assert response.status_code == 200  # a stream is 200, not the @post default 201
         received = b"".join(response.iter_bytes()).decode()
     assert "Patrick" in received
     assert "<<PERSON" not in received
@@ -386,3 +387,23 @@ def test_placeholder_note_absent_when_disabled(client: TestClient) -> None:
     )
     forwarded = route.calls.last.request.content.decode()
     assert "Privacy note" not in forwarded
+
+
+@respx.mock
+def test_query_params_forwarded_to_upstream(client: TestClient) -> None:
+    """A query string such as ?beta=true is relayed to the upstream verbatim."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200, json={"type": "message", "role": "assistant", "content": []}
+        )
+    )
+    client.post(
+        "/anthropic/v1/messages?beta=true",
+        headers=_HEADERS,
+        json={
+            "model": "claude-3-5-sonnet",
+            "max_tokens": 8,
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    assert "beta=true" in str(route.calls.last.request.url)

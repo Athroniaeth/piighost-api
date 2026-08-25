@@ -34,6 +34,7 @@ def _stream_upstream(
     pipeline: ThreadAnonymizationPipeline,
     thread_id: str,
     ephemeral: bool,
+    params: dict[str, str] | None = None,
 ) -> AsyncIterator[bytes]:
     """Yield restored SSE bytes from the upstream stream, then forget if ephemeral."""
 
@@ -44,7 +45,7 @@ def _stream_upstream(
         restorer = AnthropicStreamRestorer(replace)
         try:
             async with _client.stream(
-                "POST", f"{base}/messages", headers=headers, json=body
+                "POST", f"{base}/messages", headers=headers, json=body, params=params
             ) as upstream:
                 async for line in upstream.aiter_lines():
                     restored = await restorer.feed_line(line)
@@ -91,6 +92,7 @@ def build_anthropic_router(
         """Anonymize the request, relay it upstream, and deanonymize the reply."""
         base = upstream_base_url(request.headers, default_upstream)
         headers = forward_headers_permissive(request.headers)
+        params = dict(request.query_params)
         body = await _read_body(request)
         thread_id, ephemeral = resolve_thread(request)
         try:
@@ -101,11 +103,11 @@ def build_anthropic_router(
                 inject_system_note(body, placeholder_note)
             if body.get("stream"):
                 stream = _stream_upstream(
-                    base, headers, body, pipeline, thread_id, ephemeral
+                    base, headers, body, pipeline, thread_id, ephemeral, params
                 )
                 ephemeral = False  # the generator owns the forget now
-                return Stream(stream, media_type="text/event-stream")
-            upstream = await forward_json(base, "messages", headers, body)
+                return Stream(stream, media_type="text/event-stream", status_code=200)
+            upstream = await forward_json(base, "messages", headers, body, params)
             content_type = upstream.headers.get("content-type", "")
             if (
                 content_type.startswith("application/json")
@@ -128,6 +130,7 @@ def build_anthropic_router(
         """Anonymize the request and relay it to the upstream count_tokens endpoint."""
         base = upstream_base_url(request.headers, default_upstream)
         headers = forward_headers_permissive(request.headers)
+        params = dict(request.query_params)
         body = await _read_body(request)
         thread_id, ephemeral = resolve_thread(request)
         try:
@@ -136,7 +139,9 @@ def build_anthropic_router(
             )
             if placeholder_note:
                 inject_system_note(body, placeholder_note)
-            upstream = await forward_json(base, "messages/count_tokens", headers, body)
+            upstream = await forward_json(
+                base, "messages/count_tokens", headers, body, params
+            )
             return Response(
                 content=upstream.content,
                 status_code=upstream.status_code,

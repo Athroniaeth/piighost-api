@@ -26,10 +26,20 @@ def resolve_thread(request: Request) -> tuple[str, bool]:
 
 
 async def forward_json(
-    base: str, subpath: str, headers: dict[str, str], body: dict
+    base: str,
+    subpath: str,
+    headers: dict[str, str],
+    body: dict,
+    params: dict[str, str] | None = None,
 ) -> httpx.Response:
-    """POST a JSON body to the upstream, mapping transport errors to 502."""
+    """POST a JSON body to the upstream, mapping transport errors to 502.
+
+    Query params from the caller are relayed too, so flags such as `?beta=true`
+    reach the upstream and the relay stays transparent.
+    """
     try:
-        return await _client.post(f"{base}/{subpath}", headers=headers, json=body)
+        return await _client.post(
+            f"{base}/{subpath}", headers=headers, json=body, params=params
+        )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail=f"Upstream request failed: {exc}")
