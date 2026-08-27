@@ -21,6 +21,7 @@ nav = [
     { "Migration" = "migration.md" },
   ]},
   { "OpenAI proxy" = "openai-proxy.md" },
+  { "Anthropic proxy" = "anthropic-proxy.md" },
 ]
 
 [project.theme]

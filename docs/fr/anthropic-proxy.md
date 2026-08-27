@@ -1,0 +1,116 @@
+---
+icon: lucide/link
+---
+
+# Utiliser Claude Code via le proxy
+
+Le proxy Anthropic permet à Claude Code de communiquer avec un upstream compatible Anthropic pendant que piighost dé-identifie chaque requête et restaure chaque réponse. Claude Code n'envoie jamais les vraies données personnelles au modèle.
+
+## Deux headers
+
+- `X-PIIGhost-Upstream` (optionnel) : surcharge l'URL de base de l'upstream par requête, par exemple `https://api.anthropic.com/v1` ou une passerelle compatible. Absent, le serveur utilise `PIIGHOST_ANTHROPIC_UPSTREAM` (par défaut `https://api.anthropic.com/v1`).
+- `X-PIIGhost-Thread-Id` (optionnel) : épingle un thread d'anonymisation fixe à travers les requêtes. Absent, chaque requête utilise un thread éphémère oublié dès que la réponse est renvoyée.
+
+Le header `x-api-key` ou `Authorization: Bearer` de l'appelant est relayé tel quel vers l'upstream. Le proxy n'ajoute aucune authentification propre sur `/anthropic`.
+
+## Routes
+
+| Route | Ce que fait le proxy |
+|-------|---------------------|
+| `POST /anthropic/v1/messages` | anonymise le système, les messages et les entrées/sorties d'outils, désanonymise la réponse, streaming pris en charge |
+| `POST /anthropic/v1/messages/count_tokens` | anonymise la requête, relaie le nombre de jetons |
+
+Une route inconnue sous `/anthropic/v1` renvoie 404.
+
+## Pointez Claude Code vers le proxy
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:8000/anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+claude
+```
+
+Claude Code lit `ANTHROPIC_BASE_URL` automatiquement et route chaque appel via le proxy.
+
+## La démonstration classique
+
+1. Démarrez l'API avec un pipeline dont le détecteur reconnaît votre prénom.
+   La configuration reproductible la plus simple est un `ExactMatchDetector`,
+   décrit dans un fichier TOML :
+
+       [detector]
+       type = "exact"
+
+       [detector.values]
+       Patrick = "PERSON"
+
+   Lancez le serveur avec cette configuration sur un port local, par exemple 8080.
+
+2. Pointez Claude Code vers le proxy et fournissez une vraie clé :
+
+       export ANTHROPIC_BASE_URL=http://localhost:8080/anthropic
+       export ANTHROPIC_API_KEY=sk-ant-...
+       claude
+
+3. Dans Claude Code, demandez la première lettre de ce prénom, par exemple
+   "Quelle est la première lettre de mon prénom, Patrick ?".
+
+4. Observez deux choses. Claude ne peut pas donner la lettre, car il n'a vu que
+   `<<PERSON:1>>`, jamais `Patrick`. La transcription que vous lisez est restaurée,
+   vous voyez donc toujours `Patrick`. Le modèle était aveugle aux données
+   personnelles du début à la fin.
+
+## Notes
+
+- L'upstream par défaut est `https://api.anthropic.com/v1`. Surchargez-le par
+  requête avec un header `X-PIIGhost-Upstream`, ou globalement avec la variable
+  d'environnement `PIIGHOST_ANTHROPIC_UPSTREAM`, pour cibler une passerelle.
+- Tous les headers de l'appelant sont relayés vers l'upstream, sauf les headers
+  hop-by-hop, `host`, `content-length`, `accept-encoding` et les headers de
+  contrôle `X-PIIGhost-*`. Cela préserve le user-agent et les flags beta de
+  l'appelant pour les upstreams qui les valident.
+- Une courte consigne qui aide le modèle à manier les jetons de substitution avec
+  fluidité existe, mais elle est **désactivée par défaut** : la préfixer modifie le
+  prompt système, ce qui casse la validation d'empreinte client imposée par
+  certains comptes (entreprise ou OAuth), et l'upstream rejette alors la requête
+  avec un 429. Ne l'activez que sur un compte qui tolère un prompt système
+  modifié : mettez `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` à `default` pour la
+  consigne intégrée, ou à votre propre texte.
+- Chaque requête est un thread éphémère, ce qui correspond au comportement de
+  Claude Code qui renvoie tout l'historique à chaque tour. Passez
+  `X-PIIGhost-Thread-ID` uniquement si vous gérez vous-même un thread persistant.
+
+## Mode abonnement (OAuth)
+
+L'approche par URL de base ci-dessus vise l'usage par clé d'API ou passerelle. Un
+abonnement Pro ou Max s'authentifie en OAuth, et Claude Code code en dur le vrai
+`api.anthropic.com` pour ses appels OAuth et de rafraîchissement. Définir
+`ANTHROPIC_BASE_URL` ne fait donc pas passer le trafic d'abonnement par le proxy,
+cela vous sort du mode abonnement ou échoue. Anthropic valide aussi l'empreinte du
+client des requêtes OAuth, donc un proxy qui modifie les requêtes n'est pas un
+chemin pris en charge pour un abonnement.
+
+La même validation d'empreinte s'applique aux comptes entreprise à clé d'API.
+Toute modification du prompt système la fait échouer, ce qui se manifeste par un
+429 au message générique et sans `retry-after`. Les deux réglages qui touchent au
+prompt système sont donc désactivés par défaut :
+
+- `PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM` (défaut `false`) : le prompt système est
+  relayé intact afin que l'upstream puisse encore valider le client. Mettez-le à
+  `true` pour anonymiser aussi le prompt système, uniquement sur un compte qui le
+  tolère.
+- `PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE` (désactivé par défaut) : la consigne n'est
+  pas injectée. Pour guider le modèle sans toucher au prompt système, définissez la
+  consigne (`default` ou un texte) avec `PIIGHOST_ANTHROPIC_NOTE_PLACEMENT=user`,
+  qui la préfixe au premier message utilisateur à la place. Le placement `system`
+  ne marche que là où un prompt système modifié est toléré.
+- Le forwarding permissif des headers (toujours actif sur `/anthropic`) conserve
+  le user-agent et les flags beta de l'appelant, que l'upstream peut exiger.
+
+Le contenu des messages et des outils reste anonymisé quels que soient ces réglages.
+
+## Limites connues
+
+- Les erreurs de streaming se manifestent comme un flux cassé, pas comme un statut. Une requête en streaming s'engage sur un HTTP 200 avant l'ouverture du flux upstream, une erreur upstream en cours de flux atteint donc le client comme un flux tronqué plutôt qu'un statut d'erreur propre. Une requête non-streaming relaie fidèlement le statut de l'upstream.
+- Les images et documents sont relayés intacts. La dé-identification multimodale est hors périmètre.
+- Les définitions d'outils (`tools[]`) sont transmises intactes : le proxy anonymise uniquement le contenu qui transite par le modèle, pas le schéma que vous définissez.

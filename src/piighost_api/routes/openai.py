@@ -8,7 +8,6 @@ to the upstream, so these routes carry exclude_from_auth.
 """
 
 import json
-import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 import httpx
@@ -19,6 +18,7 @@ from litestar.response import Stream
 from piighost.components.placeholder import AsyncPlaceholderStreamDecoder
 from piighost.pipeline import ThreadAnonymizationPipeline
 
+from piighost_api.routes._relay import _client, forward_json, resolve_thread
 from piighost_api.routes._rewrite import (
     anonymize_chat_request,
     anonymize_input_field,
@@ -28,18 +28,13 @@ from piighost_api.routes._rewrite import (
 )
 from piighost_api.routes._upstream import forward_headers, upstream_base_url
 
-_RELAY_TIMEOUT = 60.0
-"""Upstream request timeout in seconds, generous enough for slow model calls."""
-
 _ROUTER_PREFIX = "/openai/v1/"
 """Mount prefix stripped off request.url.path to recover the upstream sub-path."""
 
-_client = httpx.AsyncClient(timeout=httpx.Timeout(_RELAY_TIMEOUT))
 
-
-async def _relay_raw(request: Request, subpath: str) -> Response:
+async def _relay_raw(request: Request, subpath: str, default: str | None) -> Response:
     """Forward the request to the upstream verbatim and return its raw response."""
-    base = upstream_base_url(request.headers)
+    base = upstream_base_url(request.headers, default)
     headers = forward_headers(request.headers)
     body = await request.body()
     url = f"{base}/{subpath}"
@@ -65,24 +60,6 @@ async def _relay_raw(request: Request, subpath: str) -> Response:
 def _subpath(request: Request) -> str:
     """Recover the upstream sub-path by stripping the router mount prefix."""
     return request.url.path.split(_ROUTER_PREFIX, 1)[1]
-
-
-def _resolve_thread(request: Request) -> tuple[str, bool]:
-    """Return (thread_id, ephemeral): a supplied fixed id, or a fresh ephemeral one."""
-    supplied = request.headers.get("x-piighost-thread-id")
-    if supplied:
-        return supplied, False
-    return uuid.uuid4().hex, True
-
-
-async def _forward_json(
-    base: str, subpath: str, headers: dict[str, str], body: dict
-) -> httpx.Response:
-    """POST a JSON body to the upstream, mapping transport errors to 502."""
-    try:
-        return await _client.post(f"{base}/{subpath}", headers=headers, json=body)
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=502, detail=f"Upstream request failed: {exc}")
 
 
 async def _restore_sse_chunk(raw: str, decoder: AsyncPlaceholderStreamDecoder) -> str:
@@ -141,9 +118,10 @@ async def _proxy_json(
     pipeline: ThreadAnonymizationPipeline,
     anonymize: Callable[..., Awaitable[dict]],
     deanonymize: Callable[..., Awaitable[dict]] | None,
+    default: str | None,
 ) -> Response:
     """Anonymize a JSON body, forward it, and optionally deanonymize the reply."""
-    base = upstream_base_url(request.headers)
+    base = upstream_base_url(request.headers, default)
     headers = forward_headers(request.headers)
     try:
         body = await request.json()
@@ -153,10 +131,10 @@ async def _proxy_json(
         raise HTTPException(
             status_code=400, detail="Request body must be a JSON object."
         )
-    thread_id, ephemeral = _resolve_thread(request)
+    thread_id, ephemeral = resolve_thread(request)
     try:
         await anonymize(body, pipeline, thread_id)
-        upstream = await _forward_json(base, subpath, headers, body)
+        upstream = await forward_json(base, subpath, headers, body)
         content_type = upstream.headers.get("content-type", "")
         if content_type.startswith("application/json") and upstream.status_code < 400:
             payload = upstream.json()
@@ -173,12 +151,14 @@ async def _proxy_json(
             await pipeline.forget_thread(thread_id)
 
 
-def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
-    """Build the /openai/v1 router over the given pipeline."""
+def build_openai_router(
+    pipeline: ThreadAnonymizationPipeline, default_upstream: str | None = None
+) -> Router:
+    """Build the /openai/v1 router over the given pipeline and default upstream."""
 
     @post("/chat/completions", exclude_from_auth=True)
     async def chat_completions(request: Request) -> Response:
-        base = upstream_base_url(request.headers)
+        base = upstream_base_url(request.headers, default_upstream)
         headers = forward_headers(request.headers)
         try:
             body = await request.json()
@@ -188,7 +168,7 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
             raise HTTPException(
                 status_code=400, detail="Request body must be a JSON object."
             )
-        thread_id, ephemeral = _resolve_thread(request)
+        thread_id, ephemeral = resolve_thread(request)
         try:
             await anonymize_chat_request(body, pipeline, thread_id)
             if body.get("stream"):
@@ -197,7 +177,7 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
                 )
                 ephemeral = False  # the generator owns the forget now
                 return Stream(stream, media_type="text/event-stream")
-            upstream = await _forward_json(base, "chat/completions", headers, body)
+            upstream = await forward_json(base, "chat/completions", headers, body)
             content_type = upstream.headers.get("content-type", "")
             if (
                 content_type.startswith("application/json")
@@ -217,7 +197,7 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
 
     @get(["/models", "/models/{model:str}"], exclude_from_auth=True)
     async def models(request: Request) -> Response:
-        return await _relay_raw(request, _subpath(request))
+        return await _relay_raw(request, _subpath(request), default_upstream)
 
     @post(
         [
@@ -231,7 +211,7 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
         exclude_from_auth=True,
     )
     async def multimodal(request: Request) -> Response:
-        return await _relay_raw(request, _subpath(request))
+        return await _relay_raw(request, _subpath(request), default_upstream)
 
     @post("/completions", exclude_from_auth=True)
     async def completions(request: Request) -> Response:
@@ -241,18 +221,29 @@ def build_openai_router(pipeline: ThreadAnonymizationPipeline) -> Router:
             pipeline,
             anonymize_prompt_field,
             deanonymize_completion_response,
+            default_upstream,
         )
 
     @post("/embeddings", exclude_from_auth=True)
     async def embeddings(request: Request) -> Response:
         return await _proxy_json(
-            request, "embeddings", pipeline, anonymize_input_field, None
+            request,
+            "embeddings",
+            pipeline,
+            anonymize_input_field,
+            None,
+            default_upstream,
         )
 
     @post("/moderations", exclude_from_auth=True)
     async def moderations(request: Request) -> Response:
         return await _proxy_json(
-            request, "moderations", pipeline, anonymize_input_field, None
+            request,
+            "moderations",
+            pipeline,
+            anonymize_input_field,
+            None,
+            default_upstream,
         )
 
     return Router(

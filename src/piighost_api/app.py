@@ -38,6 +38,8 @@ from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import AuthState, create_auth_guard
 from piighost_api.observation import configure_observation
+from piighost_api.routes._anthropic_shape import DEFAULT_PLACEHOLDER_NOTE
+from piighost_api.routes.anthropic import build_anthropic_router
 from piighost_api.routes.openai import build_openai_router
 
 logger = logging.getLogger(__name__)
@@ -245,7 +247,33 @@ def create_app(config_path: Path) -> Litestar:
     config = load_config(config_path)
     pipeline: ThreadAnonymizationPipeline = load_thread_pipeline(config_path)
     detector_type = config.detector.type
-    openai_router = build_openai_router(pipeline)
+    openai_upstream = os.getenv("PIIGHOST_OPENAI_UPSTREAM", "https://api.openai.com/v1")
+    anthropic_upstream = os.getenv(
+        "PIIGHOST_ANTHROPIC_UPSTREAM", "https://api.anthropic.com/v1"
+    )
+    anonymize_system = os.getenv(
+        "PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM", "false"
+    ).strip().lower() in ("1", "true", "yes", "on")
+    # Off by default: any system-prompt change breaks the client-fingerprint
+    # validation some accounts enforce, so the upstream rejects the request. Set
+    # the env to "default" for the built-in note, or to custom text, only on
+    # accounts that tolerate a modified system prompt.
+    raw_note = os.getenv("PIIGHOST_ANTHROPIC_PLACEHOLDER_NOTE", "")
+    if raw_note == "default":
+        placeholder_note = DEFAULT_PLACEHOLDER_NOTE
+    else:
+        placeholder_note = raw_note or None
+    # "user" injects the note into the first user message instead of the system
+    # prompt, for accounts that reject a modified system prompt.
+    note_placement = os.getenv("PIIGHOST_ANTHROPIC_NOTE_PLACEMENT", "system")
+    openai_router = build_openai_router(pipeline, openai_upstream)
+    anthropic_router = build_anthropic_router(
+        pipeline,
+        anthropic_upstream,
+        anonymize_system=anonymize_system,
+        placeholder_note=placeholder_note,
+        note_placement=note_placement,
+    )
 
     if configure_observation():
         logger.info("Observation export enabled")
@@ -437,6 +465,7 @@ def create_app(config_path: Path) -> Litestar:
             forget_thread,
             thread_tokens,
             openai_router,
+            anthropic_router,
         ],
         guards=[create_auth_guard(auth_state)],
         lifespan=[lifespan],
