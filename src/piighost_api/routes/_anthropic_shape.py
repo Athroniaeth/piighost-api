@@ -67,16 +67,20 @@ async def _rewrite_messages(messages: Any, op: _StringOp) -> None:
 
 
 DEFAULT_PLACEHOLDER_NOTE = (
-    "Privacy note: this conversation has been de-identified. Some values (names, "
-    "emails, phone numbers, and other personal data) are replaced by stable "
-    "placeholder tokens of the form <<LABEL:N>>, such as <<PERSON:1>> or "
-    "<<EMAIL:2>>. Each token always refers to the same underlying value. Treat a "
-    "token as the value it stands for, and reuse the exact same token verbatim "
-    "wherever you would use that value, in prose, code, tool calls, or file "
-    "contents. Do not invent or guess the real value, and do not point out that a "
-    "value is masked unless the user explicitly asks about anonymization. The "
-    "tokens are restored to their real values before the user sees your reply, so "
-    "answer naturally as if the real values were present."
+    "Privacy note: this conversation is de-identified. Real values such as names, "
+    "emails, and phone numbers are replaced by stable placeholder tokens of the "
+    "form <<LABEL:N>>, for example <<PERSON:1>> or <<EMAIL:2>>. The same token "
+    "always refers to the same value, and each token is restored to its real value "
+    "before the user sees your reply. "
+    "Use a token as an opaque stand-in: reuse the exact token verbatim wherever you "
+    "would use that value, in prose, code, tool calls, or file contents, and do "
+    "not remark that a value is masked. However, a token hides the value's actual "
+    "characters, so you do not know its spelling, letters, length, digits, or "
+    "format, and must never guess them. If asked about the internal make-up of a "
+    "masked value, such as its first letter, how it is spelled, how many characters "
+    "it has, or whether it contains something, reply that you cannot determine that "
+    "from an anonymized placeholder, instead of inventing an answer. Treat each "
+    "value only as a whole."
 )
 """Guidance prepended to the system prompt so the model handles tokens fluently."""
 
