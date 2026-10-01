@@ -226,7 +226,7 @@ def test_lifespan_auth_success() -> None:
     config, pipeline = _mock_loaders()
     with (
         patch("piighost_api.app.load_config", return_value=config),
-        patch("piighost_api.app.load_thread_pipeline", return_value=pipeline),
+        patch("piighost_api.app._thread_pipeline", return_value=pipeline),
         patch("piighost_api.app.ApiKeyService") as mock_svc_cls,
     ):
         mock_svc = MagicMock()
@@ -246,7 +246,7 @@ def test_lifespan_auth_failure() -> None:
     config, pipeline = _mock_loaders()
     with (
         patch("piighost_api.app.load_config", return_value=config),
-        patch("piighost_api.app.load_thread_pipeline", return_value=pipeline),
+        patch("piighost_api.app._thread_pipeline", return_value=pipeline),
         patch.dict(
             "os.environ",
             {"API_KEY_bad": "invalid-key-format", "PIIGHOST_ALLOW_ANONYMOUS": "true"},
@@ -277,7 +277,7 @@ def test_rate_limit_throttles_second_request(monkeypatch: pytest.MonkeyPatch) ->
     config, pipeline = _mock_loaders()
     with (
         patch("piighost_api.app.load_config", return_value=config),
-        patch("piighost_api.app.load_thread_pipeline", return_value=pipeline),
+        patch("piighost_api.app._thread_pipeline", return_value=pipeline),
     ):
         from piighost_api.app import create_app
 
@@ -301,7 +301,7 @@ def test_malformed_rate_limit_raises_clear_error(
         monkeypatch.setenv("PIIGHOST_RATE_LIMIT", bad)
         with (
             patch("piighost_api.app.load_config", return_value=config),
-            patch("piighost_api.app.load_thread_pipeline", return_value=pipeline),
+            patch("piighost_api.app._thread_pipeline", return_value=pipeline),
         ):
             from piighost_api.app import create_app
 

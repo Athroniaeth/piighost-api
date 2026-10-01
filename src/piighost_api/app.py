@@ -18,6 +18,8 @@ from contextlib import asynccontextmanager
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
+from typing import cast
+
 import msgspec
 from keyshield import ApiKeyService
 from keyshield.hasher.argon2 import Argon2ApiKeyHasher
@@ -25,13 +27,9 @@ from keyshield.repositories.in_memory import InMemoryApiKeyRepository
 from litestar import Litestar, delete, get, post
 from litestar.openapi import OpenAPIConfig
 
-from piighost.components.detector.patterns import (
-    EU_PATTERNS,
-    FR_PATTERNS,
-    GENERIC_PATTERNS,
-    US_PATTERNS,
-)
-from piighost.config import load_config, load_thread_pipeline
+from piighost import hub
+from piighost.config import PipelineConfig, load_config
+from piighost.config.models.memory import InMemoryConfig
 from piighost.conversation_memory import MessageRole
 from piighost.models import Detection, Entity, Span
 from piighost.pipeline.thread import ThreadAnonymizationPipeline
@@ -146,20 +144,13 @@ class LabelsResponse(msgspec.Struct):
 # ------------------------------------------------------------------
 
 
-_CATALOGS: dict[str, dict[str, str]] = {
-    "generic": GENERIC_PATTERNS,
-    "us": US_PATTERNS,
-    "eu": EU_PATTERNS,
-    "fr": FR_PATTERNS,
-}
-
-
 def _detector_labels(config: object) -> set[str]:
     """Collect the label vocabulary a detector config can emit.
 
     Walks the detector config tree so the /v1/labels route can offer the full
     set of labels a human corrector may reassign. Regex labels are the pattern
-    keys, inline ones plus the merged catalogs; NER and LLM labels are the
+    keys, inline ones plus those of each hub catalog, read through the hub's
+    disk cache; NER and LLM labels are the
     declared labels, or the external keys when a raw-to-canonical mapping is
     given; a composite or chunked detector contributes its children's labels. An
     unknown detector type contributes nothing.
@@ -169,7 +160,7 @@ def _detector_labels(config: object) -> set[str]:
     if detector_type == "regex":
         labels = set(getattr(config, "patterns", {}))
         for catalog in getattr(config, "catalogs", []):
-            labels |= set(_CATALOGS.get(catalog, {}))
+            labels |= set(hub.pull(catalog))
         return labels
 
     if detector_type == "composite":
@@ -193,6 +184,20 @@ def _detector_labels(config: object) -> set[str]:
         return set(labels)
 
     return set()
+
+
+def _thread_pipeline(config: PipelineConfig) -> ThreadAnonymizationPipeline:
+    """Build the thread pipeline every route runs on.
+
+    A hub configuration declares no memory, and every route is thread-scoped,
+    so a configuration without one is served with the in-process memory. That
+    keeps the threads in one process: several workers need a shared memory,
+    redis or sqlalchemy, declared in the configuration.
+    """
+    if config.memory is None:
+        memory = InMemoryConfig(type="in_memory")
+        config = config.model_copy(update={"memory": memory})
+    return cast(ThreadAnonymizationPipeline, config.build())
 
 
 def _detection_schema(detection: Detection) -> DetectionSchema:
@@ -239,13 +244,14 @@ def create_app(config_path: Path) -> Litestar:
     """Create and configure the Litestar application.
 
     Args:
-        config_path: Path to a piighost TOML or JSON configuration file.
+        config_path: Path to a piighost TOML or JSON configuration file, or a
+            hub reference such as hub:piighost/support-en:286909f6.
 
     Returns:
         A fully configured ``Litestar`` instance.
     """
     config = load_config(config_path)
-    pipeline: ThreadAnonymizationPipeline = load_thread_pipeline(config_path)
+    pipeline = _thread_pipeline(config)
     detector_type = config.detector.type
     openai_upstream = os.getenv("PIIGHOST_OPENAI_UPSTREAM", "https://api.openai.com/v1")
     anthropic_upstream = os.getenv(
