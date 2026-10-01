@@ -1,7 +1,7 @@
 [project]
 name = "piighost-api"
 version = "1.2.0"
-description = "REST API server for piighost PII anonymization inference."
+description = "An HTTP server hosting one piighost de-identification pipeline, with OpenAI- and Anthropic-compatible proxies."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -29,7 +29,7 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "piighost[config,redis]>=1.5",
+    "piighost[config,redis]>=2.0,<3",
     "httpx>=0.28",
     "keyshield[argon2]>=2.0",
     "litestar>=2.16",
@@ -54,9 +54,13 @@ observation = [
 # the current working directory so the operator doesn't have to source
 # it manually before each run.
 dataset = ["langfuse>=3.0", "python-dotenv>=1.0"]
+# A configuration whose detector is a GLiNER2 model, such as the hub's
+# support-en or fr-notarial, needs the model stack on the server.
+gliner2 = ["piighost[gliner2]"]
 
 [project.urls]
 Homepage = "https://github.com/Athroniaeth/piighost-api"
+Documentation = "https://athroniaeth.github.io/piighost/"
 Issues = "https://github.com/Athroniaeth/piighost-api/issues"
 Changelog = "https://github.com/Athroniaeth/piighost-api/blob/master/CHANGELOG.md"
 
