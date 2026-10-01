@@ -23,6 +23,10 @@ RUN if [ -n "$PIIGHOST_EXTRAS" ]; then \
         /app/.venv/bin/pip install --no-cache-dir "piighost[$PIIGHOST_EXTRAS]"; \
     fi
 
+# The default configuration, every regex group of the piighost hub. Mount
+# another file over it, or set PIIGHOST_CONFIG to a hub reference.
+COPY pipeline.toml ./
+
 # Entrypoint installs EXTRA_PACKAGES at runtime (for pre-built images)
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

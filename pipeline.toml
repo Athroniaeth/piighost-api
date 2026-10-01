@@ -1,33 +1,75 @@
 # pipeline.toml, the server's default piighost configuration.
 #
-# PIIGHOST_CONFIG can name a hub reference instead of this file, such as
-# hub:piighost/support-en:286909f6 or hub:piighost/fr-default:e6990159.
+# Every regex group of the piighost hub (https://hub.piighost.dev), 140 labels:
+# secrets and machine identifiers, the identifiers of 26 countries, identity
+# documents, company, health and payment numbers, crypto wallets, and the
+# international shapes (email, URL, IP, phone, card). Each reference is pinned
+# to a commit, fetched on the first start and read from the disk cache after.
+# Labels shared by several groups carry the same pattern in each.
 #
-# Default regex-only PII coverage (common, EU, US) with an in-memory thread
-# store, so the server boots with no external services or secrets. For a
-# multi-worker or persistent deployment, swap [memory] for a redis backend with
-# a hasher and cipher (see the piighost thread_redis example), which then needs
-# PIIGHOST_HASH_PEPPER and PIIGHOST_CIPHER_KEY in the environment.
+# The order breaks a tie between two patterns on one span: the first named
+# wins. Secrets, identity documents, company and health numbers come first,
+# the country groups next, whose phone patterns are loose, and the generic
+# shapes (card, phone, email) last. Where two patterns overlap without a tie,
+# the merge resolver below names the union after the widest.
+#
+# Regex only: the server starts with no model and no extra. For names,
+# addresses and organizations, add a model detector (see the commented block
+# at the end) and install piighost-api[gliner2].
+#
+# PIIGHOST_CONFIG can name a hub configuration instead of this file, such as
+# hub:piighost/support-en:286909f6 or hub:piighost/fr-notarial:2f602547.
 
 name = "piighost-api-default"
 
 [detector]
-type = "composite"
-
-# Common regex detector: universal patterns.
-[[detector.detectors]]
 type = "regex"
-patterns = { EMAIL = "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}", IP_V4 = "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", IP_V6 = "\\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b|\\b(?:[0-9a-fA-F]{1,4}:){1,7}:\\b|::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}\\b", URL = "https?://[^\\s<>\"']+[^\\s<>\"'.,;:!?\\)\\]}]", CREDIT_CARD = "\\b\\d{4}[\\s\\-]\\d{4}[\\s\\-]\\d{4}[\\s\\-]\\d{4}\\b", PHONE_INTERNATIONAL = "\\+\\d{1,3}[\\s.\\-]?\\(?\\d{1,4}\\)?(?:[\\s.\\-]?\\d{1,4}){1,4}", OPENAI_API_KEY = "sk-(?:proj-)?[A-Za-z0-9\\-_]{20,}", AWS_ACCESS_KEY = "\\bAKIA[0-9A-Z]{16}\\b", GITHUB_TOKEN = "\\bgh[ps]_[A-Za-z0-9_]{36,}\\b", STRIPE_KEY = "\\b[sr]k_(?:live|test)_[A-Za-z0-9]{24,}\\b" }
+catalogs = [
+    "hub:piighost/logs:b635d867",
+    "hub:piighost/identity-documents:08c163eb",
+    "hub:piighost/business:8be59133",
+    "hub:piighost/health:da8fa4c6",
+    "hub:piighost/us-extended:b82939c9",
+    "hub:piighost/us-health:596ed9cd",
+    "hub:piighost/fr-extended:0af72c1b",
+    "hub:piighost/be:bb239203",
+    "hub:piighost/ch:4aa0f6aa",
+    "hub:piighost/de:74eb9f4c",
+    "hub:piighost/at:29bc939d",
+    "hub:piighost/it:6af7753b",
+    "hub:piighost/es:3980052d",
+    "hub:piighost/pt:bd45b050",
+    "hub:piighost/nl:3a7cf0f0",
+    "hub:piighost/ie:f01a1f54",
+    "hub:piighost/dk:6ac36560",
+    "hub:piighost/se:990ac59e",
+    "hub:piighost/fi:47437c04",
+    "hub:piighost/pl:14c2e033",
+    "hub:piighost/uk:7d4e3595",
+    "hub:piighost/ca:5330fd7a",
+    "hub:piighost/mx:aeb1db74",
+    "hub:piighost/br:b48c945f",
+    "hub:piighost/ar:c9a7281a",
+    "hub:piighost/cl:2b58b122",
+    "hub:piighost/au:193c78b4",
+    "hub:piighost/in:ac86dc1b",
+    "hub:piighost/id:055741a8",
+    "hub:piighost/jp:8bba9c31",
+    "hub:piighost/kr:2ee42d25",
+    "hub:piighost/sg:12c80121",
+    "hub:piighost/payment:b1b1cd64",
+    "hub:piighost/crypto:8a80c367",
+    "hub:piighost/international:5fd947ca",
+]
 
-# EU regex detector: European patterns.
-[[detector.detectors]]
-type = "regex"
-patterns = { EU_IBAN = "\\b[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}[A-Z0-9]{0,16}\\b", EU_VAT = "\\b[A-Z]{2}\\d{8,12}\\b", FR_SSN = "\\b[12]\\d{2}(?:0[1-9]|1[0-2])\\d{2}\\d{3}\\d{3}\\d{2}(?:\\s?\\d{2})?\\b", FR_PHONE = "\\b(?:\\+33|0)[1-9](?:[\\s.\\-]?\\d{2}){4}\\b", FR_ZIP = "\\b(?:0[1-9]|[1-8]\\d|9[0-8])\\d{3}\\b", DE_PHONE = "\\b(?:\\+49|0)\\d{2,5}[\\s/\\-]?\\d{3,10}\\b", DE_ZIP = "\\b(?:0[1-9]|[1-9]\\d)\\d{3}\\b", UK_NINO = "\\b[A-CEGHJ-PR-TW-Z]{2}\\d{6}[A-D]\\b", UK_NHS = "\\b\\d{3}[\\s\\-]?\\d{3}[\\s\\-]?\\d{4}\\b", UK_POSTCODE = "\\b[A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2}\\b" }
+# Where two patterns overlap, hide the union rather than keep one and leave
+# the rest of the value in clear.
+[overlap_resolver]
+type = "merge"
 
-# US regex detector: American patterns.
-[[detector.detectors]]
-type = "regex"
-patterns = { US_SSN = "\\b(?!000|666|9\\d{2})\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}\\b", US_PHONE = "\\b(?:\\+1[\\s.\\-]?)?\\(?\\d{3}\\)?[\\s.\\-]?\\d{3}[\\s.\\-]?\\d{4}\\b", US_PASSPORT = "\\b[A-Z]\\d{8}\\b", US_ZIP_CODE = "\\b\\d{5}(?:-\\d{4})?\\b", US_EIN = "\\b\\d{2}-\\d{7}\\b", US_BANK_ROUTING = "\\b\\d{9}\\b" }
+# Find the other occurrences of every detected value in the message.
+[expander]
+type = "word_boundary"
 
 [linker]
 type = "exact"
@@ -35,5 +77,23 @@ type = "exact"
 [anonymizer.placeholder]
 type = "label_counter"
 
+# One process keeps the threads. For several workers, swap for a redis memory
+# with a hasher and a cipher, which then needs PIIGHOST_HASH_PEPPER and
+# PIIGHOST_CIPHER_KEY in the environment.
 [memory]
 type = "in_memory"
+
+# With a model, replace [detector] above by:
+#
+# [detector]
+# type = "composite"
+#
+# [[detector.detectors]]
+# type = "gliner2"
+# model = "fastino/gliner2-multi-v1"
+# labels = ["PERSON", "ADDRESS", "ORGANIZATION"]
+# max_chars = 2000
+#
+# [[detector.detectors]]
+# type = "regex"
+# catalogs = [ ...the same list... ]
