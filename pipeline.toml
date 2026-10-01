@@ -1,4 +1,7 @@
-# pipeline.toml — the server's default piighost 1.0 (v2) configuration.
+# pipeline.toml, the server's default piighost configuration.
+#
+# PIIGHOST_CONFIG can name a hub reference instead of this file, such as
+# hub:piighost/support-en:286909f6 or hub:piighost/fr-default:e6990159.
 #
 # Default regex-only PII coverage (common, EU, US) with an in-memory thread
 # store, so the server boots with no external services or secrets. For a

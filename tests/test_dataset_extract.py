@@ -79,7 +79,7 @@ def test_anonymize_trace_yields_model_only_record() -> None:
         },
     )
     trace = _trace(
-        name="piighost.anonymize_pipeline",
+        name="piighost.anonymize",
         input={"text": "Bonjour Patrick"},
         output={"text": "Bonjour <<PERSON:1>>", "entity_count": 1},
         observations=[detect_obs],
@@ -106,7 +106,7 @@ def test_trace_without_input_text_is_skipped() -> None:
 
 def test_mode_hitl_skips_anonymize_traces() -> None:
     trace = _trace(
-        name="piighost.anonymize_pipeline",
+        name="piighost.anonymize",
         input={"text": "Bonjour"},
         output={"text": "Bonjour", "entity_count": 0},
         observations=[],
