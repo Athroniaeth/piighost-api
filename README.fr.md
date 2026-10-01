@@ -1,4 +1,4 @@
-# PIIGhost API
+# piighost-api
 
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FAthroniaeth%2Fpiighost-api%2Fmaster%2Fpyproject.toml)
 [![Tested with pytest](https://img.shields.io/badge/tests-pytest-informational.svg)](https://pytest.org/)
@@ -8,65 +8,56 @@
 
 [README EN](README.md) - [README FR](README.fr.md)
 
-[Documentation EN](https://athroniaeth.github.io/piighost-api/) - [Documentation FR](https://athroniaeth.github.io/piighost-api/fr/)
-
-`piighost-api` est un serveur d'API REST pour l'anonymisation PII [piighost](https://github.com/Athroniaeth/piighost). La bibliothèque `piighost` s'intègre dans votre processus Python ; l'API héberge un unique pipeline configurable derrière HTTP afin que plusieurs processus (backends chat, jobs batch, notebooks) atteignent un seul endpoint d'inférence sans recharger les modèles ni dupliquer le cache.
+`piighost-api` est un serveur HTTP qui héberge un pipeline de dé-identification [`piighost`](https://github.com/Athroniaeth/piighost), si bien que tous les processus d'une application partagent un seul modèle et une seule mémoire de conversation. Les valeurs confidentielles, données personnelles (PII) et secrets, sont remplacées par des placeholders avant que le texte n'atteigne le LLM, puis restaurées dans la réponse. Des proxys compatibles OpenAI et Anthropic font de même pour un client existant, en changeant seulement son URL de base.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Backend chat
+    participant C as Votre application
     participant A as piighost-api
     participant L as LLM
 
-    C->>A: POST /v1/anonymize {"text": "Email Patrick"}
-    A-->>C: {"anonymized_text": "Email <<PERSON:1>>", entities: [...]}
-    C->>L: prompt with placeholders
-    L-->>C: response with placeholders
-    C->>A: POST /v1/deanonymize {"text": "...<<PERSON:1>>..."}
-    A-->>C: {"text": "...Patrick...", entities: [...]}
+    C->>A: POST /v1/anonymize {"text": "Écrivez à jean@exemple.fr"}
+    A-->>C: {"anonymized_text": "Écrivez à <<EMAIL:1>>"}
+    C->>L: prompt avec placeholders
+    L-->>C: réponse avec placeholders
+    C->>A: POST /v1/deanonymize {"text": "...<<EMAIL:1>>..."}
+    A-->>C: {"text": "...jean@exemple.fr..."}
 ```
-
-## Fonctionnalités
-
-- **Serveur d'inférence PII** : tout détecteur piighost (regex, GLiNER2, spaCy, …) chargé une fois, partagé entre les requêtes.
-- **Endpoints d'anonymisation et de désanonymisation** : pipeline complet avec détection, linking et résolution d'entités.
-- **Mémoire scopée par thread** : entités de conversation suivies par `thread_id` pour le linking inter-messages.
-- **Authentification par clé d'API** : keyshield avec Argon2, scopes, expiration.
-- **Cache Redis** : mappings d'anonymisation partagés via aiocache.
-- **Pipeline configurable** : chemin d'import `module:variable` au démarrage.
-- **CLI dataset HITL** : `piighost-api dataset extract|metrics` construit un jeu d'entrainement NER depuis les traces d'observation.
 
 ## Démarrage rapide
 
 ```bash
-uv add piighost-api
-piighost-api serve pipeline:pipeline --port 8000
+uv add piighost-api   # ou : pip install piighost-api
 ```
 
-Voir le [guide de démarrage rapide](https://athroniaeth.github.io/piighost-api/fr/getting-started/quickstart/) pour la marche à suivre complète, y compris le template `pipeline.py`.
-
-Pour le chemin Docker :
+Le serveur refuse de démarrer sans clé d'API. Pour un essai local, activez le mode anonyme, puis servez une configuration du [hub piighost](https://hub.piighost.dev) :
 
 ```bash
-docker pull ghcr.io/athroniaeth/piighost-api:latest
+export PIIGHOST_ALLOW_ANONYMOUS=true
+piighost-api serve --config hub:piighost/fr-default:e6990159
 ```
 
-## Proxy compatible OpenAI
+```bash
+curl -X POST http://127.0.0.1:8000/v1/anonymize \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Appelez le 06 12 34 56 78 ou écrivez à jean@exemple.fr", "thread_id": "demo"}'
+```
 
-`piighost-api` peut se comporter comme un proxy transparent compatible OpenAI sous `/openai/v1`. Pointez le `base_url` de votre client OpenAI vers le proxy et réglez le header `X-PIIGhost-Upstream` sur le vrai endpoint (par exemple `https://api.openai.com/v1`). Le proxy anonymise chaque requête, la relaie, et désanonymise la réponse, le fournisseur upstream ne voit donc jamais que des jetons comme `<<PERSON:1>>`. Voir le [guide du proxy OpenAI](https://athroniaeth.github.io/piighost-api/fr/openai-proxy/) pour les headers, les routes et les limites.
+La réponse porte `"anonymized_text": "Appelez le <<FR_PHONE:1>> ou écrivez à <<EMAIL:1>>"`, et `/v1/deanonymize` avec le même `thread_id` la restaure. `fr-default` ne contient que des regex, donc rien d'autre n'est téléchargé. Une configuration avec un modèle, comme `hub:piighost/support-en:286909f6`, demande `piighost-api[gliner2]`.
 
 ## Documentation
 
-- [Installation](https://athroniaeth.github.io/piighost-api/fr/getting-started/installation/)
-- [Démarrage rapide](https://athroniaeth.github.io/piighost-api/fr/getting-started/quickstart/)
-- [Endpoints REST](https://athroniaeth.github.io/piighost-api/fr/reference/endpoints/)
-- [CLI](https://athroniaeth.github.io/piighost-api/fr/reference/cli/)
-- [Proxy OpenAI](https://athroniaeth.github.io/piighost-api/fr/openai-proxy/)
+Le serveur est documenté avec la librairie, sur [athroniaeth.github.io/piighost](https://athroniaeth.github.io/piighost/fr/).
+
+- [Déployer une API de dé-identification](https://athroniaeth.github.io/piighost/fr/getting-started/api-server/), le tutoriel : une clé d'API, une configuration du hub avec un modèle, un aller-retour
+- [Proxy compatible OpenAI](https://athroniaeth.github.io/piighost/fr/examples/openai-proxy/) et [proxy compatible Anthropic](https://athroniaeth.github.io/piighost/fr/examples/anthropic-proxy/)
+- [Routes](https://athroniaeth.github.io/piighost/fr/reference/api-endpoints/) et [ligne de commande et variables d'environnement](https://athroniaeth.github.io/piighost/fr/reference/api-cli/)
+- [Déploiement avec Docker](https://athroniaeth.github.io/piighost/fr/deployment/) et le [client distant](https://athroniaeth.github.io/piighost/fr/getting-started/api-client/) de la librairie
 
 ## Communauté
 
-Rejoignez le [Discord](https://discord.gg/vFg9GHQR2s) pour obtenir de l'aide, signaler des bugs, proposer des fonctionnalités et échanger sur la dé-identification.
+Rejoignez le [Discord](https://discord.gg/vFg9GHQR2s) pour obtenir de l'aide, signaler un bug ou demander une fonctionnalité.
 
 ## Licence
 

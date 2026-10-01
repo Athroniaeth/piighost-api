@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-piighost-api is a REST API server for [piighost](https://github.com/Athroniaeth/piighost) PII anonymization inference. It wraps a `ThreadAnonymizationPipeline` behind Litestar HTTP endpoints, with keyshield API key auth and Redis caching.
+piighost-api is an HTTP server hosting one [piighost](https://github.com/Athroniaeth/piighost) de-identification pipeline. It wraps a `ThreadAnonymizationPipeline` behind Litestar HTTP endpoints, with keyshield API key auth and OpenAI- and Anthropic-compatible proxies. Its user documentation lives in the piighost docs (`docs/*/getting-started/api-server.md`, `docs/*/reference/api-endpoints.md`, `docs/*/reference/api-cli.md` in the piighost repo); this repo has none of its own.
 
 ## Development Commands
 
@@ -41,18 +41,15 @@ There is no need to `cz bump` and publish to PyPI just to test changes against t
 
 ### Application Factory (`app.py`)
 
-`create_app(pipeline_path)` builds a Litestar app:
-1. Loads the pipeline via `load_pipeline()` (module:variable pattern)
+`create_app(config_path)` builds a Litestar app:
+1. Loads the configuration with piighost's `load_config`, from a TOML/JSON file or a `hub:` reference, and builds a thread pipeline (`_thread_pipeline`), adding the in-process memory when the configuration declares none
 2. Initializes keyshield `ApiKeyService` with Argon2 hasher
 3. On startup (lifespan): loads API keys from env, enables auth guard if keys valid
 4. Registers route handlers as closures over the pipeline instance
 
 ### Endpoints
 
-- `GET /v1/config` — pipeline labels and placeholder factory type
-- `POST /v1/anonymize` — full NER detection + anonymization, returns entities
-- `POST /v1/deanonymize` — cache-based deanonymization (404 on cache miss)
-- `POST /v1/deanonymize/entities` — entity-based token replacement (for LLM responses)
+The routes are the handlers registered in `app.py` and `routes/`; read them there. The piighost docs page `reference/api-endpoints.md` lists each one with its request and response.
 
 ### Request/Response Validation
 
