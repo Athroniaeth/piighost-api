@@ -55,7 +55,9 @@ def test_health_reports_detector_type(client: TestClient) -> None:
 
 
 def test_anonymize(client: TestClient) -> None:
-    response = client.post("/v1/anonymize", json={"text": "Patrick habite à Paris"})
+    response = client.post(
+        "/v1/anonymize", json={"text": "Patrick habite à Paris", "thread_id": "t1"}
+    )
     assert response.status_code == 201
     data = response.json()
     assert data["anonymized_text"] == "<<PERSON:1>> habite à <<LOCATION:1>>"
@@ -80,10 +82,27 @@ def test_anonymize_forwards_thread_id_and_role(
 def test_anonymize_defaults_role_to_user(
     mock_pipeline: MagicMock, client: TestClient
 ) -> None:
-    client.post("/v1/anonymize", json={"text": "x"})
-    mock_pipeline.anonymize.assert_awaited_once_with(
-        "x", "default", role=MessageRole.USER
-    )
+    client.post("/v1/anonymize", json={"text": "x", "thread_id": "t1"})
+    mock_pipeline.anonymize.assert_awaited_once_with("x", "t1", role=MessageRole.USER)
+
+
+@pytest.mark.parametrize(
+    ("route", "body"),
+    [
+        ("/v1/anonymize", {"text": "x"}),
+        ("/v1/deanonymize", {"text": "x"}),
+        ("/v1/anonymize/corrected", {"text": "x", "detections": []}),
+    ],
+)
+def test_a_thread_route_without_a_thread_id_is_refused(
+    mock_pipeline: MagicMock, client: TestClient, route: str, body: dict[str, object]
+) -> None:
+    """A request naming no thread gets 400 and never reaches the shared thread."""
+    response = client.post(route, json=body)
+    assert response.status_code == 400
+    mock_pipeline.anonymize.assert_not_awaited()
+    mock_pipeline.deanonymize.assert_not_awaited()
+    mock_pipeline.anonymize_corrected.assert_not_awaited()
 
 
 # ------------------------------------------------------------------
@@ -145,7 +164,8 @@ def test_detect(mock_pipeline: MagicMock, client: TestClient) -> None:
 
 def test_deanonymize(client: TestClient) -> None:
     response = client.post(
-        "/v1/deanonymize", json={"text": "<<PERSON:1>> habite à <<LOCATION:1>>"}
+        "/v1/deanonymize",
+        json={"text": "<<PERSON:1>> habite à <<LOCATION:1>>", "thread_id": "t1"},
     )
     assert response.status_code == 201
     data = response.json()

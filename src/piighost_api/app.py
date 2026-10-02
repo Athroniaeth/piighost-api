@@ -81,19 +81,19 @@ class DetectRequest(msgspec.Struct):
 
 class AnonymizeRequest(msgspec.Struct):
     text: str
-    thread_id: str = "default"
+    thread_id: str
     role: str = "user"
 
 
 class AnonymizeCorrectedRequest(msgspec.Struct):
     text: str
     detections: list[CorrectedDetectionSchema]
-    thread_id: str = "default"
+    thread_id: str
 
 
 class DeanonymizeRequest(msgspec.Struct):
     text: str
-    thread_id: str = "default"
+    thread_id: str
 
 
 class AnonymizeResponse(msgspec.Struct):
