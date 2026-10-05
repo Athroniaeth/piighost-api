@@ -27,7 +27,7 @@ from keyshield.repositories.in_memory import InMemoryApiKeyRepository
 from litestar import Litestar, delete, get, post
 from litestar.openapi import OpenAPIConfig
 
-from piighost import hub
+from piighost.catalog import pull as pull_catalog
 from piighost.config import PipelineConfig, load_config
 from piighost.config.models.memory import InMemoryConfig
 from piighost.conversation_memory import MessageRole
@@ -149,8 +149,8 @@ def _detector_labels(config: object) -> set[str]:
 
     Walks the detector config tree so the /v1/labels route can offer the full
     set of labels a human corrector may reassign. Regex labels are the pattern
-    keys, inline ones plus those of each hub catalog, read through the hub's
-    disk cache; NER and LLM labels are the
+    keys, inline ones plus those of each catalog group, read through the
+    catalog's disk cache; NER and LLM labels are the
     declared labels, or the external keys when a raw-to-canonical mapping is
     given; a composite or chunked detector contributes its children's labels. An
     unknown detector type contributes nothing.
@@ -160,7 +160,7 @@ def _detector_labels(config: object) -> set[str]:
     if detector_type == "regex":
         labels = set(getattr(config, "patterns", {}))
         for catalog in getattr(config, "catalogs", []):
-            labels |= set(hub.pull(catalog))
+            labels |= set(pull_catalog(catalog))
         return labels
 
     if detector_type == "composite":
@@ -189,7 +189,7 @@ def _detector_labels(config: object) -> set[str]:
 def _thread_pipeline(config: PipelineConfig) -> ThreadAnonymizationPipeline:
     """Build the thread pipeline every route runs on.
 
-    A hub configuration declares no memory, and every route is thread-scoped,
+    A catalog configuration declares no memory, and every route is thread-scoped,
     so a configuration without one is served with the in-process memory. That
     keeps the threads in one process: several workers need a shared memory,
     redis or sqlalchemy, declared in the configuration.
@@ -245,7 +245,7 @@ def create_app(config_path: Path) -> Litestar:
 
     Args:
         config_path: Path to a piighost TOML or JSON configuration file, or a
-            hub reference such as hub:piighost/support-en:286909f6.
+            catalog reference such as catalog:piighost/support-en:286909f6.
 
     Returns:
         A fully configured ``Litestar`` instance.

@@ -31,11 +31,11 @@ def test_v1_config_route_is_removed(monkeypatch) -> None:
     assert response.status_code == 404
 
 
-def test_the_labels_of_a_hub_catalog_come_from_the_hub(monkeypatch) -> None:
-    """A catalog is a hub reference in piighost 2.0, so its labels are pulled."""
+def test_the_labels_of_a_catalog_group_come_from_the_catalog(monkeypatch) -> None:
+    """A catalog group is a catalog reference in piighost 2.0, so its labels are pulled."""
     monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
     group = {"EMAIL": r"\S+@\S+", "URL": r"https?://\S+"}
-    monkeypatch.setattr("piighost.hub.pull", lambda ref, **kwargs: group)
+    monkeypatch.setattr("piighost_api.app.pull_catalog", lambda ref, **kwargs: group)
     monkeypatch.setattr(
         "piighost.config.models.detector.pull", lambda ref, **kwargs: group
     )
