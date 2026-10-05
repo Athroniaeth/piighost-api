@@ -27,15 +27,13 @@ sequenceDiagram
 
 ## Quickstart
 
-```bash
-uv add piighost-api   # or: pip install piighost-api
-```
-
-The server refuses to start without an API key. For a local trial, opt in to anonymous mode, then serve a configuration from the [piighost hub](https://hub.piighost.dev):
+The server ships as a Docker image, `ghcr.io/athroniaeth/piighost-api`. It refuses to start without an API key. For a local trial, opt in to anonymous mode and serve a configuration from the [piighost catalog](https://catalog.piighost.dev/en/):
 
 ```bash
-export PIIGHOST_ALLOW_ANONYMOUS=true
-piighost-api serve --config hub:piighost/fr-default:e6990159
+docker run -p 8000:8000 \
+  -e PIIGHOST_ALLOW_ANONYMOUS=true \
+  -e PIIGHOST_CONFIG=catalog:piighost/fr-default:e6990159 \
+  ghcr.io/athroniaeth/piighost-api:latest
 ```
 
 ```bash
@@ -44,16 +42,16 @@ curl -X POST http://127.0.0.1:8000/v1/anonymize \
   -d '{"text": "Appelez le 06 12 34 56 78 ou écrivez à jean@exemple.fr", "thread_id": "demo"}'
 ```
 
-The reply carries `"anonymized_text": "Appelez le <<FR_PHONE:1>> ou écrivez à <<EMAIL:1>>"`, and `/v1/deanonymize` with the same `thread_id` restores it. `fr-default` is regex only, so nothing else is downloaded. A configuration with a model, such as `hub:piighost/support-en:286909f6`, needs `piighost-api[gliner2]`.
+The reply carries `"anonymized_text": "Appelez le <<FR_PHONE:1>> ou écrivez à <<EMAIL:1>>"`, and `/v1/deanonymize` with the same `thread_id` restores it. `fr-default` is regex only, so nothing else is downloaded. A configuration with a model, such as `catalog:piighost/support-en:286909f6`, needs the `gliner2` extra: add `-e EXTRA_PACKAGES="piighost[gliner2]"`, or build the image with `--build-arg PIIGHOST_EXTRAS=gliner2`.
 
 ## Documentation
 
-The server is documented with the library, at [athroniaeth.github.io/piighost](https://athroniaeth.github.io/piighost/).
+The server is documented with the library, at [docs.piighost.dev](https://docs.piighost.dev/en/).
 
-- [Deploy a de-identification API](https://athroniaeth.github.io/piighost/getting-started/api-server/), the tutorial: an API key, a hub configuration with a model, a round trip
-- [OpenAI-compatible proxy](https://athroniaeth.github.io/piighost/examples/openai-proxy/) and [Anthropic-compatible proxy](https://athroniaeth.github.io/piighost/examples/anthropic-proxy/)
-- [Routes](https://athroniaeth.github.io/piighost/reference/api-endpoints/) and [command line and environment variables](https://athroniaeth.github.io/piighost/reference/api-cli/)
-- [Deployment with Docker](https://athroniaeth.github.io/piighost/deployment/) and the [remote client](https://athroniaeth.github.io/piighost/getting-started/api-client/) of the library
+- [Deploy a de-identification API](https://docs.piighost.dev/en/guide/getting-started/api-server/), the tutorial: an API key, a catalog configuration with a model, a round trip
+- [OpenAI-compatible proxy](https://docs.piighost.dev/en/guide/examples/openai-proxy/) and [Anthropic-compatible proxy](https://docs.piighost.dev/en/guide/examples/anthropic-proxy/)
+- [Routes](https://docs.piighost.dev/en/guide/reference/api-endpoints/) and [command line and environment variables](https://docs.piighost.dev/en/guide/reference/api-cli/)
+- [Deployment with Docker](https://docs.piighost.dev/en/guide/deployment/) and the [remote client](https://docs.piighost.dev/en/guide/getting-started/api-client/) of the library
 
 ## Community
 
