@@ -23,9 +23,7 @@ def test_app_registers_anthropic_messages_route() -> None:
     config.name = "test"
     config.detector.type = "exact"
     with patch("piighost_api.app.load_config", return_value=config):
-        with patch(
-            "piighost_api.app.load_thread_pipeline", return_value=_mock_pipeline()
-        ):
+        with patch("piighost_api.app._thread_pipeline", return_value=_mock_pipeline()):
             from piighost_api.app import create_app
 
             app: Litestar = create_app(FIXTURES / "minimal.toml")

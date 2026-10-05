@@ -10,6 +10,7 @@ from litestar import Litestar
 from litestar.testing import TestClient
 
 from piighost.components.anonymizer.base import Anonymization
+from piighost.components.placeholder import PreservesLabeledIdentityOpaque
 from piighost.conversation_memory import Forgotten
 from piighost.models import Detection, Entity, Span
 
@@ -31,9 +32,9 @@ def _make_entity(
 ENTITY_PERSON = _make_entity("Patrick", "PERSON", 0, 7)
 ENTITY_LOCATION = _make_entity("Paris", "LOCATION", 17, 22, confidence=0.92)
 
-TOKENS: dict[Entity, str] = {
-    ENTITY_PERSON: "<<PERSON:1>>",
-    ENTITY_LOCATION: "<<LOCATION:1>>",
+TOKENS: dict[Entity, PreservesLabeledIdentityOpaque] = {
+    ENTITY_PERSON: PreservesLabeledIdentityOpaque("<<PERSON:1>>"),
+    ENTITY_LOCATION: PreservesLabeledIdentityOpaque("<<LOCATION:1>>"),
 }
 
 
@@ -114,7 +115,7 @@ def app(
     """Create a Litestar app with a mock pipeline (bypasses config loading)."""
     with (
         patch("piighost_api.app.load_config", return_value=mock_config),
-        patch("piighost_api.app.load_thread_pipeline", return_value=mock_pipeline),
+        patch("piighost_api.app._thread_pipeline", return_value=mock_pipeline),
     ):
         from piighost_api.app import create_app
 

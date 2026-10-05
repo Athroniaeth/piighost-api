@@ -1,4 +1,4 @@
-# PIIGhost API
+# piighost-api
 
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FAthroniaeth%2Fpiighost-api%2Fmaster%2Fpyproject.toml)
 [![Tested with pytest](https://img.shields.io/badge/tests-pytest-informational.svg)](https://pytest.org/)
@@ -8,90 +8,56 @@
 
 [README EN](README.md) - [README FR](README.fr.md)
 
-[Documentation EN](https://athroniaeth.github.io/piighost-api/) - [Documentation FR](https://athroniaeth.github.io/piighost-api/fr/)
-
-`piighost-api` is a REST API server for [piighost](https://github.com/Athroniaeth/piighost) PII anonymization. The library `piighost` embeds in your Python process; the API hosts a single configurable pipeline behind HTTP so multiple processes (chat backends, batch jobs, notebooks) hit one inference endpoint without re-loading models or duplicating cache state.
+`piighost-api` is an HTTP server that hosts one [`piighost`](https://github.com/Athroniaeth/piighost) de-identification pipeline, so every process of an application shares one model and one conversation memory. Confidential values, personal data (PII) and secrets, are replaced by placeholders before the text reaches the LLM, then restored in the reply. OpenAI- and Anthropic-compatible proxies do the same for an existing client with a base URL change.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Chat backend
+    participant C as Your app
     participant A as piighost-api
     participant L as LLM
 
-    C->>A: POST /v1/anonymize {"text": "Email Patrick"}
-    A-->>C: {"anonymized_text": "Email <<PERSON:1>>", entities: [...]}
+    C->>A: POST /v1/anonymize {"text": "Write to jean@exemple.fr"}
+    A-->>C: {"anonymized_text": "Write to <<EMAIL:1>>"}
     C->>L: prompt with placeholders
-    L-->>C: response with placeholders
-    C->>A: POST /v1/deanonymize {"text": "...<<PERSON:1>>..."}
-    A-->>C: {"text": "...Patrick...", entities: [...]}
+    L-->>C: reply with placeholders
+    C->>A: POST /v1/deanonymize {"text": "...<<EMAIL:1>>..."}
+    A-->>C: {"text": "...jean@exemple.fr..."}
 ```
 
-## Features
-
-- **PII inference server** : any piighost detector (regex, GLiNER2, spaCy, …) loaded once, shared across requests.
-- **Anonymize / deanonymize endpoints** : full pipeline with entity detection, linking, and resolution.
-- **Thread-scoped memory** : conversation entities tracked per `thread_id` for cross-message linking.
-- **API key authentication** : keyshield with Argon2, scopes, expiration.
-- **Redis cache** : shared anonymization mappings via aiocache.
-- **Configurable pipeline** : `module:variable` import path at startup.
-- **HITL dataset CLI** : `piighost-api dataset extract|metrics` builds a NER training set from observation traces.
-
-## Quick start
+## Quickstart
 
 ```bash
-uv add piighost-api
-piighost-api serve pipeline:pipeline --port 8000
+uv add piighost-api   # or: pip install piighost-api
 ```
 
-See the [Quickstart guide](https://athroniaeth.github.io/piighost-api/getting-started/quickstart/) for the full walk-through, including the `pipeline.py` template.
-
-For the Docker path:
+The server refuses to start without an API key. For a local trial, opt in to anonymous mode, then serve a configuration from the [piighost hub](https://hub.piighost.dev):
 
 ```bash
-docker pull ghcr.io/athroniaeth/piighost-api:latest
+export PIIGHOST_ALLOW_ANONYMOUS=true
+piighost-api serve --config hub:piighost/fr-default:e6990159
 ```
 
-> **Note:** `docker compose up` now refuses to start unless either `API_KEY` is set (loaded as `API_KEY_default`) or `PIIGHOST_ALLOW_ANONYMOUS=true` is passed. This is the secure default: with no key and no explicit anonymous opt-in, the API will not serve PII endpoints unauthenticated. The compose file also surfaces `PIIGHOST_MAX_BODY_BYTES` and `PIIGHOST_RATE_LIMIT` so operators can tune them.
-
-## Environment variables
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `PIIGHOST_ALLOW_ANONYMOUS` | unset | The server refuses to start without valid `API_KEY_<name>` entries. Set to `true` (or `1`, `yes`, `on`) to explicitly opt in to serving PII endpoints without authentication. |
-| `PIIGHOST_MAX_BODY_BYTES` | `1000000` | Maximum request body size in bytes. Larger requests are rejected with HTTP 413 before any NER inference runs. |
-| `PIIGHOST_RATE_LIMIT` | unset | Per-client rate limit as `<unit>:<count>` (e.g. `minute:300`, units: `second`, `minute`, `hour`, `day`). Excess requests get HTTP 429. `/` and `/health` are exempt. Disabled when unset. |
-| `REDIS_URL` | unset | Connection URL for the Redis anonymization cache. Required by the shipped `pipeline.toml`; see below. |
-
-## Cache configuration
-
-The shipped `pipeline.toml` configures a shared Redis cache:
-
-```toml
-[cache]
-type = "redis"
-url_env = "REDIS_URL"
+```bash
+curl -X POST http://127.0.0.1:8000/v1/anonymize \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Appelez le 06 12 34 56 78 ou écrivez à jean@exemple.fr", "thread_id": "demo"}'
 ```
 
-With this config, `REDIS_URL` must be set. docker-compose provides it; without it, startup fails loudly with a `ConfigError` naming the missing variable rather than silently falling back. A shared backend is what keeps placeholder mappings consistent across workers behind a load balancer.
-
-For a bare-local run without Redis, point the server at a `pipeline.toml` that omits the `[cache]` section. The pipeline then uses the in-process memory cache. This is single-worker only: the mapping is not shared, so multiple workers would assign inconsistent placeholders for the same `thread_id`.
-
-## OpenAI-compatible proxy
-
-`piighost-api` can act as a transparent OpenAI-compatible proxy under `/openai/v1`. Point your OpenAI client's `base_url` at the proxy and set the `X-PIIGhost-Upstream` header to the real endpoint (for example `https://api.openai.com/v1`). The proxy anonymizes every request, forwards it, and deanonymizes the reply, so the upstream provider only ever sees tokens like `<<PERSON:1>>`. See the [OpenAI proxy guide](https://athroniaeth.github.io/piighost-api/openai-proxy/) for headers, routes, and limitations.
+The reply carries `"anonymized_text": "Appelez le <<FR_PHONE:1>> ou écrivez à <<EMAIL:1>>"`, and `/v1/deanonymize` with the same `thread_id` restores it. `fr-default` is regex only, so nothing else is downloaded. A configuration with a model, such as `hub:piighost/support-en:286909f6`, needs `piighost-api[gliner2]`.
 
 ## Documentation
 
-- [Installation](https://athroniaeth.github.io/piighost-api/getting-started/installation/)
-- [Quickstart](https://athroniaeth.github.io/piighost-api/getting-started/quickstart/)
-- [REST endpoints](https://athroniaeth.github.io/piighost-api/reference/endpoints/)
-- [CLI](https://athroniaeth.github.io/piighost-api/reference/cli/)
-- [OpenAI proxy](https://athroniaeth.github.io/piighost-api/openai-proxy/)
+The server is documented with the library, at [athroniaeth.github.io/piighost](https://athroniaeth.github.io/piighost/).
+
+- [Deploy a de-identification API](https://athroniaeth.github.io/piighost/getting-started/api-server/), the tutorial: an API key, a hub configuration with a model, a round trip
+- [OpenAI-compatible proxy](https://athroniaeth.github.io/piighost/examples/openai-proxy/) and [Anthropic-compatible proxy](https://athroniaeth.github.io/piighost/examples/anthropic-proxy/)
+- [Routes](https://athroniaeth.github.io/piighost/reference/api-endpoints/) and [command line and environment variables](https://athroniaeth.github.io/piighost/reference/api-cli/)
+- [Deployment with Docker](https://athroniaeth.github.io/piighost/deployment/) and the [remote client](https://athroniaeth.github.io/piighost/getting-started/api-client/) of the library
 
 ## Community
 
-Join the [Discord](https://discord.gg/vFg9GHQR2s) to get help, report bugs, request features, and discuss de-identification.
+Join the [Discord](https://discord.gg/vFg9GHQR2s) to get help, report bugs and request features.
 
 ## License
 

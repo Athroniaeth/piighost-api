@@ -17,6 +17,7 @@ from pathlib import Path
 
 import typer
 import uvicorn
+from piighost.catalog import SCHEMES as _CATALOG_SCHEMES
 
 from piighost_api.dataset.extract import (
     ANONYMIZE_TRACE_NAME,
@@ -46,7 +47,8 @@ def serve(
         None,
         "--config",
         "-c",
-        help="Path to a piighost TOML configuration file. "
+        help="Path to a piighost TOML configuration file, or a catalog reference "
+        "such as catalog:piighost/support-en:286909f6. "
         "Falls back to the PIIGHOST_CONFIG environment variable.",
     ),
     host: str = typer.Option("127.0.0.1", help="Bind host."),
@@ -57,9 +59,10 @@ def serve(
 ) -> None:
     """Start the API server.
 
-    The pipeline configuration is loaded from a TOML file. Pass it via
-    ``--config <path.toml>`` or set ``PIIGHOST_CONFIG`` in the environment.
-    The old ``module:variable`` Python loader has been removed.
+    The pipeline configuration is loaded from a TOML file or from a catalog
+    reference. Pass it via ``--config <path.toml>`` or
+    ``--config catalog:namespace/name:commit`` (``hub:`` still works), or set ``PIIGHOST_CONFIG`` in the
+    environment. The old ``module:variable`` Python loader has been removed.
     """
     logging.basicConfig(
         level=getattr(logging, log_level.upper()),
@@ -75,11 +78,14 @@ def serve(
             err=True,
         )
         raise typer.Exit(code=1)
-    if not config.exists():
-        typer.echo(f"Configuration file not found: {config}", err=True)
-        raise typer.Exit(code=1)
+    source = str(config)
+    if not source.startswith(_CATALOG_SCHEMES):
+        if not config.exists():
+            typer.echo(f"Configuration file not found: {config}", err=True)
+            raise typer.Exit(code=1)
+        source = str(config.resolve())
 
-    os.environ["PIIGHOST_CONFIG"] = str(config.resolve())
+    os.environ["PIIGHOST_CONFIG"] = source
     uvicorn.run(
         "piighost_api.cli:_create_app",
         factory=True,

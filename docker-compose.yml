@@ -8,17 +8,15 @@ services:
       - API_HOST=${API_HOST:-0.0.0.0}
       - API_PORT=${API_PORT:-8000}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - SECRET_PEPPER=${SECRET_PEPPER}
       - API_KEY_default=${API_KEY}
       - PIIGHOST_ALLOW_ANONYMOUS=${PIIGHOST_ALLOW_ANONYMOUS:-}
       - PIIGHOST_MAX_BODY_BYTES=${PIIGHOST_MAX_BODY_BYTES:-1000000}
       - PIIGHOST_RATE_LIMIT=${PIIGHOST_RATE_LIMIT:-}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
-      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
-      - OPIK_API_KEY=${OPIK_API_KEY:-}
-      - OPIK_WORKSPACE=${OPIK_WORKSPACE:-}
+      - PIIGHOST_OPENAI_UPSTREAM=${PIIGHOST_OPENAI_UPSTREAM:-https://api.openai.com/v1}
+      - PIIGHOST_ANTHROPIC_UPSTREAM=${PIIGHOST_ANTHROPIC_UPSTREAM:-https://api.anthropic.com/v1}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS:-}
       - EXTRA_PACKAGES=${EXTRA_PACKAGES:-}
     volumes:
       - ./pipeline.toml:/app/pipeline.toml
@@ -26,6 +24,8 @@ services:
     depends_on:
       - redis
 
+  # Only used by a configuration declaring a redis memory, whose url points
+  # at redis://redis:6379.
   redis:
     image: redis:7-alpine
     ports:

@@ -29,3 +29,30 @@ def test_v1_config_route_is_removed(monkeypatch) -> None:
     with TestClient(app=app) as client:
         response = client.get("/v1/config")
     assert response.status_code == 404
+
+
+def test_the_labels_of_a_catalog_group_come_from_the_catalog(monkeypatch) -> None:
+    """A catalog group is a catalog reference in piighost 2.0, so its labels are pulled."""
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
+    group = {"EMAIL": r"\S+@\S+", "URL": r"https?://\S+"}
+    monkeypatch.setattr("piighost_api.app.pull_catalog", lambda ref, **kwargs: group)
+    monkeypatch.setattr(
+        "piighost.config.models.detector.pull", lambda ref, **kwargs: group
+    )
+    app = create_app(FIXTURES / "hub_catalog.toml")
+    with TestClient(app=app) as client:
+        response = client.get("/v1/labels")
+    assert response.json()["labels"] == ["EMAIL", "EMPLOYEE_ID", "URL"]
+
+
+def test_a_config_without_memory_is_served_with_the_in_process_one(
+    monkeypatch,
+) -> None:
+    """A hub configuration declares no memory, so the server supplies one."""
+    monkeypatch.setenv("PIIGHOST_ALLOW_ANONYMOUS", "true")
+    app = create_app(FIXTURES / "no_memory.toml")
+    payload = {"text": "write a@b.co", "thread_id": "t1"}
+    with TestClient(app=app) as client:
+        first = client.post("/v1/anonymize", json=payload).json()
+        again = client.post("/v1/anonymize", json=payload).json()
+    assert first["anonymized_text"] == again["anonymized_text"] == "write <<EMAIL:1>>"

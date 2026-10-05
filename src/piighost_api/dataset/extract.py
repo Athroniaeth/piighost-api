@@ -21,7 +21,7 @@ class DatasetMode(str, Enum):
 
 
 HITL_TRACE_NAME = "piighost.hitl_correction"
-ANONYMIZE_TRACE_NAME = "piighost.anonymize_pipeline"
+ANONYMIZE_TRACE_NAME = "piighost.anonymize"
 DETECT_OBS_NAME = "piighost.detect"
 
 

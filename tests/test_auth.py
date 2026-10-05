@@ -65,7 +65,7 @@ def _build_app(mock_pipeline: MagicMock, mock_config: MagicMock) -> Litestar:
     """Build the real app with a mocked pipeline (same patching as the app fixture)."""
     with (
         patch("piighost_api.app.load_config", return_value=mock_config),
-        patch("piighost_api.app.load_thread_pipeline", return_value=mock_pipeline),
+        patch("piighost_api.app._thread_pipeline", return_value=mock_pipeline),
     ):
         from piighost_api.app import create_app
 
