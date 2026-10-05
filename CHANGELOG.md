@@ -1,3 +1,43 @@
+## 2.0.0 (2026-10-05)
+
+### BREAKING CHANGE
+
+- piighost-api needs piighost 2.0.
+
+### Feat
+
+- piighost-api on piighost 2.0 (#6)
+- piighost-api on piighost 2.0
+- a catalog reference starts the server and names its labels, the hub prefix still works
+- the thread routes require a thread_id
+- the default configuration runs every regex group of the piighost hub
+- run on piighost 2.0, and serve a configuration straight from the hub
+- **routes**: improve the placeholder note to stop the model inventing masked-value details
+- **routes**: inject the guidance note into the first user message option
+- **routes**: prepend a placeholder guidance note to the Anthropic proxy system prompt
+- **app**: default PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM to false
+- **routes**: permissive Anthropic header forwarding and optional system anonymization
+- **app**: register the Anthropic proxy and configurable upstream defaults
+- **routes**: Anthropic Messages proxy router
+- **routes**: Anthropic SSE per-index stream restorer
+- **routes**: Anthropic request/response content-block walker
+- **routes**: default upstream fallback and Anthropic header forwarding
+
+### Fix
+
+- dataset extract finds piighost 2.0 traces, and the env files name what the server reads
+- **routes**: default the placeholder note OFF; a modified system prompt breaks client-fingerprint validation
+- **routes**: relay upstream errors and rate-limit headers on the Anthropic proxy
+- **routes**: stream returns 200 (not the @post default 201) and relay query params
+- **routes**: drop all X-PIIGhost-* headers by prefix before forwarding upstream
+
+### Refactor
+
+- **routes**: extract shared relay helpers into _relay
+
+
+- require piighost 2.0, and a gliner2 extra for model configurations
+
 ## 1.2.0 (2026-08-21)
 
 ### Feat
