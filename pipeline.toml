@@ -17,49 +17,49 @@
 # addresses and organizations, add a model detector (see the commented block
 # at the end) and install piighost-api[gliner2].
 #
-# PIIGHOST_CONFIG can name a hub configuration instead of this file, such as
-# hub:piighost/support-en:286909f6 or hub:piighost/fr-notarial:2f602547.
+# PIIGHOST_CONFIG can name a catalog configuration instead of this file, such as
+# catalog:piighost/support-en:286909f6 or catalog:piighost/fr-notarial:2f602547.
 
 name = "piighost-api-default"
 
 [detector]
 type = "regex"
 catalogs = [
-    "hub:piighost/logs:b635d867",
-    "hub:piighost/identity-documents:08c163eb",
-    "hub:piighost/business:8be59133",
-    "hub:piighost/health:da8fa4c6",
-    "hub:piighost/us-extended:b82939c9",
-    "hub:piighost/us-health:596ed9cd",
-    "hub:piighost/fr-extended:0af72c1b",
-    "hub:piighost/be:bb239203",
-    "hub:piighost/ch:4aa0f6aa",
-    "hub:piighost/de:74eb9f4c",
-    "hub:piighost/at:29bc939d",
-    "hub:piighost/it:6af7753b",
-    "hub:piighost/es:3980052d",
-    "hub:piighost/pt:bd45b050",
-    "hub:piighost/nl:3a7cf0f0",
-    "hub:piighost/ie:f01a1f54",
-    "hub:piighost/dk:6ac36560",
-    "hub:piighost/se:990ac59e",
-    "hub:piighost/fi:47437c04",
-    "hub:piighost/pl:14c2e033",
-    "hub:piighost/uk:7d4e3595",
-    "hub:piighost/ca:5330fd7a",
-    "hub:piighost/mx:aeb1db74",
-    "hub:piighost/br:b48c945f",
-    "hub:piighost/ar:c9a7281a",
-    "hub:piighost/cl:2b58b122",
-    "hub:piighost/au:193c78b4",
-    "hub:piighost/in:ac86dc1b",
-    "hub:piighost/id:055741a8",
-    "hub:piighost/jp:8bba9c31",
-    "hub:piighost/kr:2ee42d25",
-    "hub:piighost/sg:12c80121",
-    "hub:piighost/payment:b1b1cd64",
-    "hub:piighost/crypto:8a80c367",
-    "hub:piighost/international:5fd947ca",
+    "catalog:piighost/logs:b635d867",
+    "catalog:piighost/identity-documents:08c163eb",
+    "catalog:piighost/business:8be59133",
+    "catalog:piighost/health:da8fa4c6",
+    "catalog:piighost/us-extended:b82939c9",
+    "catalog:piighost/us-health:596ed9cd",
+    "catalog:piighost/fr-extended:0af72c1b",
+    "catalog:piighost/be:bb239203",
+    "catalog:piighost/ch:4aa0f6aa",
+    "catalog:piighost/de:74eb9f4c",
+    "catalog:piighost/at:29bc939d",
+    "catalog:piighost/it:6af7753b",
+    "catalog:piighost/es:3980052d",
+    "catalog:piighost/pt:bd45b050",
+    "catalog:piighost/nl:3a7cf0f0",
+    "catalog:piighost/ie:f01a1f54",
+    "catalog:piighost/dk:6ac36560",
+    "catalog:piighost/se:990ac59e",
+    "catalog:piighost/fi:47437c04",
+    "catalog:piighost/pl:14c2e033",
+    "catalog:piighost/uk:7d4e3595",
+    "catalog:piighost/ca:5330fd7a",
+    "catalog:piighost/mx:aeb1db74",
+    "catalog:piighost/br:b48c945f",
+    "catalog:piighost/ar:c9a7281a",
+    "catalog:piighost/cl:2b58b122",
+    "catalog:piighost/au:193c78b4",
+    "catalog:piighost/in:ac86dc1b",
+    "catalog:piighost/id:055741a8",
+    "catalog:piighost/jp:8bba9c31",
+    "catalog:piighost/kr:2ee42d25",
+    "catalog:piighost/sg:12c80121",
+    "catalog:piighost/payment:b1b1cd64",
+    "catalog:piighost/crypto:8a80c367",
+    "catalog:piighost/international:5fd947ca",
 ]
 
 # Where two patterns overlap, hide the union rather than keep one and leave
