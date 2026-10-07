@@ -68,9 +68,25 @@ def test_upstream_sees_tokens_reply_is_restored(client: TestClient) -> None:
     assert response.json()["content"][0]["text"] == "Hi Patrick"
 
 
+_SYSTEM = "You are the support assistant of an online shop. You help Patrick."
+"""A system prompt the developer wrote, holding a value the detector knows."""
+
+
+def _opted_in_client(placeholder_note: str | None = None) -> TestClient:
+    """A client over a router that de-identifies the system prompt too."""
+    pipeline = ThreadAnonymizationPipeline(ExactMatchDetector({"Patrick": "PERSON"}))
+    router = build_anthropic_router(
+        pipeline,
+        default_upstream=_DEFAULT,
+        anonymize_system=True,
+        placeholder_note=placeholder_note,
+    )
+    return TestClient(app=Litestar(route_handlers=[router]))
+
+
 @respx.mock
-def test_system_prompt_is_anonymized(client: TestClient) -> None:
-    """The system prompt is anonymized before forwarding to the upstream."""
+def test_system_prompt_stays_in_clear_by_default(client: TestClient) -> None:
+    """The developer's system prompt reaches the upstream as written."""
     route = respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(
             200,
@@ -83,12 +99,89 @@ def test_system_prompt_is_anonymized(client: TestClient) -> None:
         json={
             "model": "claude-3-5-sonnet",
             "max_tokens": 64,
-            "system": "You help Patrick.",
-            "messages": [{"role": "user", "content": "hi"}],
+            "system": _SYSTEM,
+            "messages": [{"role": "user", "content": "I am Patrick"}],
         },
     )
-    forwarded = route.calls.last.request.content.decode()
-    assert "Patrick" not in forwarded
+    forwarded = json.loads(route.calls.last.request.content)
+    assert forwarded["system"] == _SYSTEM
+    assert forwarded["messages"][0]["content"] == "I am <<PERSON:1>>"
+
+
+@respx.mock
+def test_streamed_system_prompt_stays_in_clear_by_default(client: TestClient) -> None:
+    """A streamed request also relays the system prompt as written."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200,
+            content="event: message_stop\ndata: {}\n\n",
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+    with client.stream(
+        "POST",
+        "/anthropic/v1/messages",
+        headers=_HEADERS,
+        json={
+            "model": "claude-3-5-sonnet",
+            "max_tokens": 64,
+            "stream": True,
+            "system": [{"type": "text", "text": _SYSTEM}],
+            "messages": [{"role": "user", "content": "I am Patrick"}],
+        },
+    ) as response:
+        b"".join(response.iter_bytes())
+    forwarded = json.loads(route.calls.last.request.content)
+    assert forwarded["system"] == [{"type": "text", "text": _SYSTEM}]
+    assert forwarded["messages"][0]["content"] == "I am <<PERSON:1>>"
+
+
+@respx.mock
+def test_system_prompt_is_anonymized_when_opted_in() -> None:
+    """With anonymize_system, the system prompt is de-identified too."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200,
+            json={"type": "message", "role": "assistant", "content": []},
+        )
+    )
+    with _opted_in_client() as tc:
+        tc.post(
+            "/anthropic/v1/messages",
+            headers=_HEADERS,
+            json={
+                "model": "claude-3-5-sonnet",
+                "max_tokens": 64,
+                "system": "You help Patrick.",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+    forwarded = json.loads(route.calls.last.request.content)
+    assert forwarded["system"] == "You help <<PERSON:1>>."
+
+
+@respx.mock
+def test_placeholder_note_is_not_anonymized_when_system_is() -> None:
+    """The note is injected after de-identification, so it arrives verbatim."""
+    route = respx.post("https://api.anthropic.com/v1/messages").mock(
+        return_value=httpx.Response(
+            200,
+            json={"type": "message", "role": "assistant", "content": []},
+        )
+    )
+    with _opted_in_client(placeholder_note="Note for Patrick.") as tc:
+        tc.post(
+            "/anthropic/v1/messages",
+            headers=_HEADERS,
+            json={
+                "model": "claude-3-5-sonnet",
+                "max_tokens": 64,
+                "system": "You help Patrick.",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+    forwarded = json.loads(route.calls.last.request.content)
+    assert forwarded["system"] == "Note for Patrick.\n\nYou help <<PERSON:1>>."
 
 
 @respx.mock
@@ -299,7 +392,7 @@ def test_stream_restores_token_split_across_deltas(client: TestClient) -> None:
 
 @respx.mock
 def test_system_preserved_when_disabled_and_headers_relayed() -> None:
-    """With anonymize_system=False the system stays intact while messages anonymize; OAuth headers relay."""
+    """With anonymize_system=False the system stays intact, messages anonymize, OAuth headers relay."""
     detector = ExactMatchDetector({"Patrick": "PERSON"})
     pipeline = ThreadAnonymizationPipeline(detector)
     router = build_anthropic_router(

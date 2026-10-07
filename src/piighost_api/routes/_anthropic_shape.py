@@ -1,9 +1,9 @@
 """Field-level anonymize and deanonymize for Anthropic Messages bodies.
 
-Only known text-bearing fields are rewritten: the system prompt, message
-content blocks, tool_use inputs, and tool_result contents. Images, documents,
-and tool definitions are forwarded untouched, so the proxy stays robust to the
-Anthropic schema evolving. All rewriting goes through the pipeline's public
+Only known text-bearing fields are rewritten: message content blocks, tool_use
+inputs, tool_result contents, and the system prompt when asked to. Images,
+documents, and tool definitions are forwarded untouched, so the proxy stays
+robust to the Anthropic schema evolving. All rewriting goes through the pipeline's public
 anonymize and deanonymize, over a single thread per request.
 """
 
@@ -138,14 +138,14 @@ async def anonymize_anthropic_request(
     body: dict[str, Any],
     pipeline: ThreadAnonymizationPipeline,
     thread_id: str,
-    anonymize_system: bool = True,
+    anonymize_system: bool = False,
 ) -> dict[str, Any]:
-    """Anonymize a Messages request body's system prompt and message content.
+    """Anonymize a Messages request body's message content, and its system prompt.
 
-    When anonymize_system is False the system prompt is left untouched, which a
-    subscription-authenticated harness such as Claude Code needs so the upstream
-    can still validate its client fingerprint; message content is anonymized
-    either way.
+    The system prompt is the developer's own, so it is left untouched unless
+    anonymize_system is True. Leaving it also keeps the client fingerprint a
+    subscription-authenticated harness such as Claude Code is validated on.
+    Message content is anonymized either way.
     """
     op = _anonymizer(pipeline, thread_id)
     if anonymize_system and "system" in body:

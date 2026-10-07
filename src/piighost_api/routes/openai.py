@@ -155,11 +155,13 @@ async def _proxy_json(
 def build_openai_router(
     pipeline: ThreadAnonymizationPipeline,
     default_upstream: str | None = None,
+    anonymize_system: bool = False,
 ) -> Router:
     """Build the /openai/v1 router over the given pipeline and default upstream.
 
     The router restores replies, so it refuses a pipeline whose placeholder
-    factory cannot be reversed.
+    factory cannot be reversed. The system and developer messages are relayed in
+    clear unless anonymize_system is True.
     """
     require_reversible(pipeline)
 
@@ -177,7 +179,7 @@ def build_openai_router(
             )
         thread_id, ephemeral = resolve_thread(request)
         try:
-            await anonymize_chat_request(body, pipeline, thread_id)
+            await anonymize_chat_request(body, pipeline, thread_id, anonymize_system)
             if body.get("stream"):
                 stream = _stream_upstream(
                     base, headers, body, pipeline, thread_id, ephemeral

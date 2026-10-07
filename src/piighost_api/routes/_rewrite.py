@@ -53,12 +53,21 @@ async def _rewrite_content(content: Any, op: _StringOp) -> Any:
     return content
 
 
-async def _rewrite_messages(messages: Any, op: _StringOp) -> None:
-    """Rewrite message content and tool_call arguments in place."""
+SYSTEM_ROLES = frozenset({"system", "developer"})
+"""The roles whose messages the developer writes, the system prompt of a request."""
+
+
+async def _rewrite_messages(
+    messages: Any, op: _StringOp, skip_roles: frozenset[str] = frozenset()
+) -> None:
+    """Rewrite message content and tool_call arguments in place.
+
+    A message whose role is in skip_roles is left as it is.
+    """
     if not isinstance(messages, list):
         return
     for message in messages:
-        if not isinstance(message, dict):
+        if not isinstance(message, dict) or message.get("role") in skip_roles:
             continue
         if "content" in message:
             message["content"] = await _rewrite_content(message["content"], op)
@@ -94,10 +103,20 @@ def _deanonymizer(pipeline: ThreadAnonymizationPipeline, thread_id: str) -> _Str
 
 
 async def anonymize_chat_request(
-    body: dict[str, Any], pipeline: ThreadAnonymizationPipeline, thread_id: str
+    body: dict[str, Any],
+    pipeline: ThreadAnonymizationPipeline,
+    thread_id: str,
+    anonymize_system: bool = False,
 ) -> dict[str, Any]:
-    """Anonymize a chat/completions request body's messages and tool_call args."""
-    await _rewrite_messages(body.get("messages"), _anonymizer(pipeline, thread_id))
+    """Anonymize a chat/completions request body's messages and tool_call args.
+
+    The system and developer messages are the developer's own prompt, so they are
+    left in clear unless anonymize_system is True.
+    """
+    skip_roles = frozenset() if anonymize_system else SYSTEM_ROLES
+    await _rewrite_messages(
+        body.get("messages"), _anonymizer(pipeline, thread_id), skip_roles
+    )
     return body
 
 

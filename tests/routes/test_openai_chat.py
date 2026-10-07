@@ -1,5 +1,7 @@
 """Tests for the OpenAI-proxy chat/completions route (non-streaming)."""
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -110,3 +112,55 @@ def test_ephemeral_thread_is_forgotten(monkeypatch: pytest.MonkeyPatch) -> None:
             json={"model": "m", "messages": [{"role": "user", "content": "Patrick"}]},
         )
     forget.assert_awaited_once()
+
+
+_SYSTEM = "You are the support assistant of an online shop. You help Patrick."
+"""A system prompt the developer wrote, holding a value the detector knows."""
+
+
+def _chat_body(**extra: object) -> dict[str, object]:
+    """A chat request with a system, a developer and a user message."""
+    return {
+        "model": "gpt-4o",
+        "messages": [
+            {"role": "system", "content": _SYSTEM},
+            {"role": "developer", "content": "Patrick is a VIP."},
+            {"role": "user", "content": "I am Patrick"},
+        ],
+        **extra,
+    }
+
+
+_HEADERS = {
+    "x-piighost-upstream": "https://up.example/v1",
+    "authorization": "Bearer sk-test",
+    "content-type": "application/json",
+}
+
+
+@respx.mock
+def test_system_prompt_stays_in_clear_by_default(client: TestClient) -> None:
+    """The system and developer messages reach the upstream as written."""
+    route = respx.post("https://up.example/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"choices": []})
+    )
+    client.post("/openai/v1/chat/completions", headers=_HEADERS, json=_chat_body())
+    messages = json.loads(route.calls.last.request.content)["messages"]
+    assert messages[0]["content"] == _SYSTEM
+    assert messages[1]["content"] == "Patrick is a VIP."
+    assert messages[2]["content"] == "I am <<PERSON:1>>"
+
+
+@respx.mock
+def test_system_prompt_is_anonymized_when_opted_in() -> None:
+    """With anonymize_system, the system and developer messages are de-identified."""
+    pipeline = ThreadAnonymizationPipeline(ExactMatchDetector({"Patrick": "PERSON"}))
+    router = build_openai_router(pipeline, anonymize_system=True)
+    route = respx.post("https://up.example/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"choices": []})
+    )
+    with TestClient(app=Litestar(route_handlers=[router])) as tc:
+        tc.post("/openai/v1/chat/completions", headers=_HEADERS, json=_chat_body())
+    messages = json.loads(route.calls.last.request.content)["messages"]
+    assert "Patrick" not in json.dumps(messages)
+    assert messages[1]["content"] == "<<PERSON:1>> is a VIP."

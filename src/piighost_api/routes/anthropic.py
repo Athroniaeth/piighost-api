@@ -79,22 +79,23 @@ def _consume_upstream_stream(
 def build_anthropic_router(
     pipeline: ThreadAnonymizationPipeline,
     default_upstream: str | None = None,
-    anonymize_system: bool = True,
+    anonymize_system: bool = False,
     placeholder_note: str | None = None,
     note_placement: str = "system",
 ) -> Router:
     """Build the /anthropic/v1 router over the given pipeline and default upstream.
 
     The router restores replies, so it refuses a pipeline whose placeholder
-    factory cannot be reversed. When anonymize_system is False the system prompt
-    is relayed untouched, for a subscription- or enterprise-authenticated harness
-    whose client fingerprint the upstream validates; message content is
-    anonymized regardless. placeholder_note
-    is opt-in guidance for the model, off by default. note_placement chooses where
-    it goes: "system" prepends it to the system prompt (rejected by accounts that
-    validate the system-prompt fingerprint), "user" prepends it to the first user
-    message instead, which those accounts tolerate since message content is not
-    part of the fingerprint.
+    factory cannot be reversed. The system prompt is the developer's own, so it
+    is relayed untouched unless anonymize_system is True, which also keeps the
+    client fingerprint a subscription- or enterprise-authenticated harness is
+    validated on; message content is anonymized regardless.
+
+    placeholder_note is opt-in guidance for the model, off by default.
+    note_placement chooses where it goes: "system" prepends it to the system
+    prompt (rejected by accounts that validate the system-prompt fingerprint),
+    "user" prepends it to the first user message instead, which those accounts
+    tolerate since message content is not part of the fingerprint.
     """
     require_reversible(pipeline)
 

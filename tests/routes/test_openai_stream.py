@@ -1,5 +1,7 @@
 """Tests for the OpenAI-proxy chat/completions streaming path."""
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -87,3 +89,39 @@ def test_stream_ending_mid_token_flushes_the_fragment(client: TestClient) -> Non
     # The incomplete token is emitted unreplaced by flush, not silently dropped;
     # a partial token carries no real value, so nothing leaks.
     assert "<<PER" in received
+
+
+@respx.mock
+def test_streamed_system_prompt_stays_in_clear_by_default(client: TestClient) -> None:
+    """A streamed request also relays the system and developer messages as written."""
+    system = "You are the support assistant of an online shop. You help Patrick."
+    route = respx.post("https://up.example/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            content="data: [DONE]\n\n",
+            headers={"content-type": "text/event-stream"},
+        )
+    )
+    with client.stream(
+        "POST",
+        "/openai/v1/chat/completions",
+        headers={
+            "x-piighost-upstream": "https://up.example/v1",
+            "authorization": "Bearer x",
+            "content-type": "application/json",
+        },
+        json={
+            "model": "m",
+            "stream": True,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "developer", "content": "Patrick is a VIP."},
+                {"role": "user", "content": "I am Patrick"},
+            ],
+        },
+    ) as response:
+        b"".join(response.iter_bytes())
+    messages = json.loads(route.calls.last.request.content)["messages"]
+    assert messages[0]["content"] == system
+    assert messages[1]["content"] == "Patrick is a VIP."
+    assert messages[2]["content"] == "I am <<PERSON:1>>"

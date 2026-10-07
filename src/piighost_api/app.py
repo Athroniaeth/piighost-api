@@ -269,6 +269,9 @@ def create_app(config_path: Path) -> Litestar:
     anthropic_upstream = os.getenv(
         "PIIGHOST_ANTHROPIC_UPSTREAM", "https://api.anthropic.com/v1"
     )
+    # The developer writes the system prompt, so it reaches the provider in clear
+    # unless these opt in to de-identifying it.
+    openai_anonymize_system = _env_flag("PIIGHOST_OPENAI_ANONYMIZE_SYSTEM")
     anthropic_anonymize_system = _env_flag("PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM")
     # Off by default: any system-prompt change breaks the client-fingerprint
     # validation some accounts enforce, so the upstream rejects the request. Set
@@ -469,7 +472,9 @@ def create_app(config_path: Path) -> Litestar:
         route_handlers += [
             deanonymize,
             thread_tokens,
-            build_openai_router(pipeline, openai_upstream),
+            build_openai_router(
+                pipeline, openai_upstream, anonymize_system=openai_anonymize_system
+            ),
             build_anthropic_router(
                 pipeline,
                 anthropic_upstream,

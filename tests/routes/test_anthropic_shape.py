@@ -24,12 +24,12 @@ def pipeline() -> ThreadAnonymizationPipeline:
 
 
 async def test_anonymize_string_system_and_message(pipeline) -> None:
-    """A string system prompt and string message content are both anonymized."""
+    """Opted in, a string system prompt and string message content are anonymized."""
     body = {
         "system": "You help Patrick.",
         "messages": [{"role": "user", "content": "I am Patrick"}],
     }
-    await anonymize_anthropic_request(body, pipeline, "t1")
+    await anonymize_anthropic_request(body, pipeline, "t1", anonymize_system=True)
     assert "Patrick" not in body["system"]
     assert "<<PERSON:1>>" in body["system"]
     assert "Patrick" not in body["messages"][0]["content"]
@@ -37,14 +37,14 @@ async def test_anonymize_string_system_and_message(pipeline) -> None:
 
 
 async def test_anonymize_block_system_and_text_block(pipeline) -> None:
-    """A block-list system prompt and a text content block are both anonymized."""
+    """Opted in, a block-list system prompt and a text block are anonymized."""
     body = {
         "system": [{"type": "text", "text": "Help Patrick."}],
         "messages": [
             {"role": "user", "content": [{"type": "text", "text": "I am Patrick"}]}
         ],
     }
-    await anonymize_anthropic_request(body, pipeline, "t1")
+    await anonymize_anthropic_request(body, pipeline, "t1", anonymize_system=True)
     assert "Patrick" not in body["system"][0]["text"]
     assert "Patrick" not in body["messages"][0]["content"][0]["text"]
     assert "<<PERSON:1>>" in body["messages"][0]["content"][0]["text"]
@@ -219,13 +219,13 @@ async def test_restorer_flush_emits_trailing_fragment(pipeline) -> None:
     assert restorer.flush() == "<<PER"
 
 
-async def test_anonymize_skips_system_when_disabled(pipeline) -> None:
-    """With anonymize_system=False, the system prompt is left intact, messages still anonymized."""
+async def test_anonymize_skips_system_by_default(pipeline) -> None:
+    """By default the system prompt is left intact, messages still anonymized."""
     body = {
         "system": "You help Patrick.",
         "messages": [{"role": "user", "content": "I am Patrick"}],
     }
-    await anonymize_anthropic_request(body, pipeline, "t1", anonymize_system=False)
+    await anonymize_anthropic_request(body, pipeline, "t1")
     assert body["system"] == "You help Patrick."
     assert "Patrick" not in body["messages"][0]["content"]
     assert "<<PERSON:1>>" in body["messages"][0]["content"]
