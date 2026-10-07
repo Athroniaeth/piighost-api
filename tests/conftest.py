@@ -10,7 +10,10 @@ from litestar import Litestar
 from litestar.testing import TestClient
 
 from piighost.components.anonymizer.base import Anonymization
-from piighost.components.placeholder import PreservesLabeledIdentityOpaque
+from piighost.components.placeholder import (
+    LabelCounterPlaceholderFactory,
+    PreservesLabeledIdentityOpaque,
+)
 from piighost.conversation_memory import Forgotten
 from piighost.models import Detection, Entity, Span
 
@@ -38,6 +41,17 @@ TOKENS: dict[Entity, PreservesLabeledIdentityOpaque] = {
 }
 
 
+def reversible_mock() -> MagicMock:
+    """A mock pipeline whose placeholder factory is a real, reversible one.
+
+    create_app and the proxy routers check the factory before serving a route
+    that restores, so a bare MagicMock, whose factory is a mock, is refused.
+    """
+    pipeline = MagicMock()
+    pipeline.anonymizer.factory = LabelCounterPlaceholderFactory()
+    return pipeline
+
+
 @pytest.fixture
 def mock_pipeline() -> MagicMock:
     """Mock ThreadAnonymizationPipeline exposing the v2 async API.
@@ -46,7 +60,7 @@ def mock_pipeline() -> MagicMock:
     map), deanonymize returns a plain string, forget_thread returns a Forgotten,
     and the detect preview reads the pipeline's detector and linker.
     """
-    pipeline = MagicMock()
+    pipeline = reversible_mock()
 
     pipeline.anonymize = AsyncMock(
         return_value=Anonymization(

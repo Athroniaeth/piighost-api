@@ -11,7 +11,7 @@ from piighost.conversation_memory import MessageRole
 
 from piighost_api.app import _serialize_tokens
 
-from conftest import FIXTURES, TOKENS
+from conftest import FIXTURES, TOKENS, reversible_mock
 
 
 # ------------------------------------------------------------------
@@ -237,7 +237,7 @@ def _mock_loaders() -> tuple[MagicMock, MagicMock]:
     config = MagicMock()
     config.name = "test"
     config.detector.type = "regex"
-    pipeline = MagicMock()
+    pipeline = reversible_mock()
     pipeline.anonymize = AsyncMock()
     return config, pipeline
 

@@ -5,14 +5,14 @@ import pytest
 import respx
 from litestar import Litestar
 from litestar.testing import TestClient
-from unittest.mock import MagicMock
-
 from piighost_api.routes.openai import build_openai_router
+
+from conftest import reversible_mock
 
 
 @pytest.fixture
 def client() -> TestClient:
-    pipeline = MagicMock()
+    pipeline = reversible_mock()
     app = Litestar(route_handlers=[build_openai_router(pipeline)])
     return TestClient(app=app)
 

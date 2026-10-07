@@ -18,6 +18,7 @@ from litestar.response import Stream
 
 from piighost.pipeline import ThreadAnonymizationPipeline
 
+from piighost_api.reversible import require_reversible
 from piighost_api.routes._anthropic_shape import (
     AnthropicStreamRestorer,
     anonymize_anthropic_request,
@@ -84,15 +85,18 @@ def build_anthropic_router(
 ) -> Router:
     """Build the /anthropic/v1 router over the given pipeline and default upstream.
 
-    When anonymize_system is False the system prompt is relayed untouched, for a
-    subscription- or enterprise-authenticated harness whose client fingerprint the
-    upstream validates; message content is anonymized regardless. placeholder_note
+    The router restores replies, so it refuses a pipeline whose placeholder
+    factory cannot be reversed. When anonymize_system is False the system prompt
+    is relayed untouched, for a subscription- or enterprise-authenticated harness
+    whose client fingerprint the upstream validates; message content is
+    anonymized regardless. placeholder_note
     is opt-in guidance for the model, off by default. note_placement chooses where
     it goes: "system" prepends it to the system prompt (rejected by accounts that
     validate the system-prompt fingerprint), "user" prepends it to the first user
     message instead, which those accounts tolerate since message content is not
     part of the fingerprint.
     """
+    require_reversible(pipeline)
 
     async def _read_body(request: Request) -> dict:
         """Parse and validate the request body as a JSON object, raising 400 otherwise."""

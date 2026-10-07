@@ -1,0 +1,13 @@
+# A redact configuration: every value becomes the same <<REDACT>>.
+[detector]
+type = "exact"
+
+[detector.values]
+"postgres://app:s3cret@db.internal/shop" = "DATABASE_URL"
+"Patrick" = "PERSON"
+
+[anonymizer.placeholder]
+type = "redact"
+
+[memory]
+type = "in_memory"

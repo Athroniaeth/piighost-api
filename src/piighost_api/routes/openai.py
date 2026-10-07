@@ -18,6 +18,7 @@ from litestar.response import Stream
 from piighost.components.placeholder import AsyncPlaceholderStreamDecoder
 from piighost.pipeline import ThreadAnonymizationPipeline
 
+from piighost_api.reversible import require_reversible
 from piighost_api.routes._relay import _client, forward_json, resolve_thread
 from piighost_api.routes._rewrite import (
     anonymize_chat_request,
@@ -152,9 +153,15 @@ async def _proxy_json(
 
 
 def build_openai_router(
-    pipeline: ThreadAnonymizationPipeline, default_upstream: str | None = None
+    pipeline: ThreadAnonymizationPipeline,
+    default_upstream: str | None = None,
 ) -> Router:
-    """Build the /openai/v1 router over the given pipeline and default upstream."""
+    """Build the /openai/v1 router over the given pipeline and default upstream.
+
+    The router restores replies, so it refuses a pipeline whose placeholder
+    factory cannot be reversed.
+    """
+    require_reversible(pipeline)
 
     @post("/chat/completions", exclude_from_auth=True)
     async def chat_completions(request: Request) -> Response:

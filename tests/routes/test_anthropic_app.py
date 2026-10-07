@@ -5,11 +5,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from litestar import Litestar
 
+from conftest import reversible_mock
+
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 def _mock_pipeline() -> MagicMock:
-    pipeline = MagicMock()
+    pipeline = reversible_mock()
     pipeline.anonymize = AsyncMock()
     pipeline.deanonymize = AsyncMock()
     pipeline.forget_thread = AsyncMock()

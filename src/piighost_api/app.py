@@ -36,6 +36,7 @@ from piighost.pipeline.thread import ThreadAnonymizationPipeline
 
 from piighost_api.auth import AuthState, create_auth_guard
 from piighost_api.observation import configure_observation
+from piighost_api.reversible import require_reversible
 from piighost_api.routes._anthropic_shape import DEFAULT_PLACEHOLDER_NOTE
 from piighost_api.routes.anthropic import build_anthropic_router
 from piighost_api.routes.openai import build_openai_router
@@ -186,6 +187,11 @@ def _detector_labels(config: object) -> set[str]:
     return set()
 
 
+def _env_flag(name: str) -> bool:
+    """Whether an environment variable is set to 1, true, yes or on."""
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _thread_pipeline(config: PipelineConfig) -> ThreadAnonymizationPipeline:
     """Build the thread pipeline every route runs on.
 
@@ -253,13 +259,17 @@ def create_app(config_path: Path) -> Litestar:
     config = load_config(config_path)
     pipeline = _thread_pipeline(config)
     detector_type = config.detector.type
+    # The proxies and the restoring routes need a factory whose tokens map back
+    # to one value each. PIIGHOST_ONE_WAY drops those routes, which lets a
+    # one-way factory such as redact serve detect and anonymize alone.
+    one_way = _env_flag("PIIGHOST_ONE_WAY")
+    if not one_way:
+        require_reversible(pipeline)
     openai_upstream = os.getenv("PIIGHOST_OPENAI_UPSTREAM", "https://api.openai.com/v1")
     anthropic_upstream = os.getenv(
         "PIIGHOST_ANTHROPIC_UPSTREAM", "https://api.anthropic.com/v1"
     )
-    anonymize_system = os.getenv(
-        "PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM", "false"
-    ).strip().lower() in ("1", "true", "yes", "on")
+    anthropic_anonymize_system = _env_flag("PIIGHOST_ANTHROPIC_ANONYMIZE_SYSTEM")
     # Off by default: any system-prompt change breaks the client-fingerprint
     # validation some accounts enforce, so the upstream rejects the request. Set
     # the env to "default" for the built-in note, or to custom text, only on
@@ -272,14 +282,6 @@ def create_app(config_path: Path) -> Litestar:
     # "user" injects the note into the first user message instead of the system
     # prompt, for accounts that reject a modified system prompt.
     note_placement = os.getenv("PIIGHOST_ANTHROPIC_NOTE_PLACEMENT", "system")
-    openai_router = build_openai_router(pipeline, openai_upstream)
-    anthropic_router = build_anthropic_router(
-        pipeline,
-        anthropic_upstream,
-        anonymize_system=anonymize_system,
-        placeholder_note=placeholder_note,
-        note_placement=note_placement,
-    )
 
     if configure_observation():
         logger.info("Observation export enabled")
@@ -304,12 +306,7 @@ def create_app(config_path: Path) -> Litestar:
             auth_state["enabled"] = True
             logger.info("API keys loaded, auth enabled")
         except Exception as exc:
-            if os.getenv("PIIGHOST_ALLOW_ANONYMOUS", "").strip().lower() not in (
-                "1",
-                "true",
-                "yes",
-                "on",
-            ):
+            if not _env_flag("PIIGHOST_ALLOW_ANONYMOUS"):
                 raise RuntimeError(
                     "No valid API keys found and PIIGHOST_ALLOW_ANONYMOUS is not "
                     "set. Refusing to serve PII endpoints unauthenticated; define "
@@ -459,20 +456,31 @@ def create_app(config_path: Path) -> Litestar:
             ).middleware
         )
 
-    return Litestar(
-        route_handlers=[
-            index,
-            health,
-            labels,
-            detect,
-            anonymize,
-            anonymize_corrected,
+    route_handlers = [
+        index,
+        health,
+        labels,
+        detect,
+        anonymize,
+        anonymize_corrected,
+        forget_thread,
+    ]
+    if not one_way:
+        route_handlers += [
             deanonymize,
-            forget_thread,
             thread_tokens,
-            openai_router,
-            anthropic_router,
-        ],
+            build_openai_router(pipeline, openai_upstream),
+            build_anthropic_router(
+                pipeline,
+                anthropic_upstream,
+                anonymize_system=anthropic_anonymize_system,
+                placeholder_note=placeholder_note,
+                note_placement=note_placement,
+            ),
+        ]
+
+    return Litestar(
+        route_handlers=route_handlers,
         guards=[create_auth_guard(auth_state)],
         lifespan=[lifespan],
         request_max_body_size=max_body,
