@@ -1,3 +1,10 @@
+## 2.0.1 (2026-10-08)
+
+### Fix
+
+- **proxy**: leave the developer's system prompt in clear
+- **proxy**: refuse to restore through a placeholder factory that cannot be reversed
+
 ## 2.0.0 (2026-10-05)
 
 ### BREAKING CHANGE

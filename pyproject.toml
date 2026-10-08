@@ -1,6 +1,6 @@
 [project]
 name = "piighost-api"
-version = "2.0.0"
+version = "2.0.1"
 description = "An HTTP server hosting one piighost de-identification pipeline, with OpenAI- and Anthropic-compatible proxies."
 readme = "README.md"
 license = { text = "MIT" }
