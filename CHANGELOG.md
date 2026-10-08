@@ -1,3 +1,9 @@
+## 2.0.2 (2026-10-08)
+
+### Fix
+
+- **deps**: piighost 2.1.0, and the patched multidict, pydantic-settings, litestar, urllib3, anyio and idna
+
 ## 2.0.1 (2026-10-08)
 
 ### Fix
