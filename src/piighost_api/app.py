@@ -13,6 +13,7 @@ plus a detection preview and health/labels endpoints for human consumers.
 
 import logging
 import os
+import re
 from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from importlib.metadata import version as _pkg_version
@@ -192,6 +193,34 @@ def _env_flag(name: str) -> bool:
     return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
+_EXTRA = re.compile(r"piighost\[([A-Za-z0-9_,-]+)\]")
+"""The extra named by piighost's missing-package messages, pip install piighost[x]."""
+
+
+class MissingExtraError(RuntimeError):
+    """Raised when the configuration needs a piighost extra the server lacks."""
+
+
+def _missing_extra(exc: ImportError) -> MissingExtraError | None:
+    """Turn piighost's pip hint into one that works for this server, or None.
+
+    piighost names the extra to install with pip. A server started from the
+    Docker image installs it through EXTRA_PACKAGES or PIIGHOST_EXTRAS instead,
+    so the hint names those.
+    """
+    match = _EXTRA.search(str(exc))
+    if match is None:
+        return None
+    extra = match.group(1)
+    return MissingExtraError(
+        f"The configuration needs the piighost[{extra}] extra, which this server "
+        f"does not have. In the Docker image, start the container with -e "
+        f'EXTRA_PACKAGES="piighost[{extra}]", or build the image with '
+        f"--build-arg PIIGHOST_EXTRAS={extra}. Outside Docker, install "
+        f"piighost[{extra}] in the server's environment. ({exc})"
+    )
+
+
 def _thread_pipeline(config: PipelineConfig) -> ThreadAnonymizationPipeline:
     """Build the thread pipeline every route runs on.
 
@@ -203,7 +232,13 @@ def _thread_pipeline(config: PipelineConfig) -> ThreadAnonymizationPipeline:
     if config.memory is None:
         memory = InMemoryConfig(type="in_memory")
         config = config.model_copy(update={"memory": memory})
-    return cast(ThreadAnonymizationPipeline, config.build())
+    try:
+        return cast(ThreadAnonymizationPipeline, config.build())
+    except ImportError as exc:
+        hint = _missing_extra(exc)
+        if hint is None:
+            raise
+        raise hint from exc
 
 
 def _detection_schema(detection: Detection) -> DetectionSchema:
