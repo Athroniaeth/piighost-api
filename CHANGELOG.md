@@ -1,3 +1,9 @@
+## 2.0.3 (2026-10-08)
+
+### Fix
+
+- **docker**: a two-stage image without uv, and the CPU build of PyTorch when no GPU is found
+
 ## 2.0.2 (2026-10-08)
 
 ### Fix
