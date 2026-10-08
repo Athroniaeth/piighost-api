@@ -1,3 +1,9 @@
+## 2.0.4 (2026-10-08)
+
+### Fix
+
+- **app**: a configuration that needs a missing extra says how to add it to the image
+
 ## 2.0.3 (2026-10-08)
 
 ### Fix
